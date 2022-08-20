@@ -1,5 +1,5 @@
-# You wont get it
-token.yml
+# Env variables
+.env
 
 # Byte-compiled / optimized / DLL files
 __pycache__/

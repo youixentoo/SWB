@@ -8,6 +8,8 @@ import nest_asyncio
 nest_asyncio.apply()
 
 import os
+import time
+import sqlite3
 import logging
 import discord
 from uuid import uuid4
@@ -32,11 +34,13 @@ intents.message_content = True
       
 bot = commands.Bot(command_prefix='!', intents=intents)
 
+conn = sqlite3.connect('db/storage.db')
+
 class ShowCodeButtonView(discord.ui.View): # Create a class called ShowCodeButtonView that subclasses discord.ui.View
-    def __init__(self, *, code, unique_id, **kwargs):
+    def __init__(self, *, code, db_primary_key, **kwargs):
         super().__init__(**kwargs, timeout=300) # I think it's in seconds
         self.code = code
-        self.unique_id = unique_id
+        self.db_primary_key = db_primary_key
         
     async def on_timeout(self):
         for child in self.children:
@@ -47,7 +51,8 @@ class ShowCodeButtonView(discord.ui.View): # Create a class called ShowCodeButto
     async def button_callback(self, button, interaction):
         # print(dir(interaction))
         print(f"Button pressed by: {interaction.user}")
-        tempSaveData(self.code, interaction.user)
+        show_code_db(self.db_primary_key, interaction.user)
+        # tempSaveData(self.code, interaction.user)
         await interaction.response.send_message(content=self.code.upper(), ephemeral=True) # Send a message when the button is clicked
         
         
@@ -62,11 +67,15 @@ class ShowCodeButtonView(discord.ui.View): # Create a class called ShowCodeButto
 """
 What to store in database:
     - 'Primary key'
-    - Lobby code
-    - Host
-    - List of players
-    - Date created match
-    - UUID
+    - Lobby code (TGHTYF) - str
+    - Host (youixentoo#6937) - str
+    - List of players - 1-to-many # https://www.reddit.com/r/learnpython/comments/93cief/how_to_store_a_list_in_one_sqlite3_column/
+        -- Point to primary key
+    - Date created match - int --> unix time, using unixepoch() method
+    - UUID - str
+    
+    Table 1: Lobby
+        Table 2: Participants
 
 """
 
@@ -78,6 +87,7 @@ async def on_ready():
     
 @bot.command()
 async def lobby(ctx, lobby_code, *args):
+    message_unix_time = int(time.time())
     origin = ctx.message
     host = f"{origin.author.name}#{origin.author.discriminator}"
     unique_id = uuid4()
@@ -86,53 +96,46 @@ async def lobby(ctx, lobby_code, *args):
         description=f"Match hosted by: {host}\nID: {unique_id}",
         color=discord.Colour.blurple(), # Pycord provides a class with default colors you can choose from
     )
-    # print(origin)
+    db_primary_key = lobby_creation_db(lobby_code.upper(), host, message_unix_time, unique_id)
     await origin.delete() # Deletes the command message
-    await ctx.send(view=ShowCodeButtonView(code=lobby_code, unique_id=unique_id), embed=embed)
+    await ctx.send(view=ShowCodeButtonView(code=lobby_code, db_primary_key=db_primary_key), embed=embed)
     
     
 @bot.command()
 async def getData(ctx, lobby_code):
-    match_data = tempShowData(lobby_code)
+    match_data = get_data_db()
     await ctx.send(match_data)
     
     
+def lobby_creation_db(lobby_code, host, unix_time, unique_id):    
+    cur = conn.cursor()
     
-def tempLoadStorage():
-    with open("storage.json") as json_file:
-        return json.load(json_file)
-
-def tempSaveStorage(tempData):
-    with open("storage.json", "w") as json_file:
-        return json.dump(tempData, json_file)
-    
-    
-def tempSaveData(match_id, player):
-    tempData = tempLoadStorage()
-    player_string = f"{player.name}#{player.discriminator}"
-    
-    if(tempData.get(match_id)):
-        tempPlayerData = tempData[match_id]
-        if not(player_string in tempPlayerData):
-            print("player already in list")
-            tempPlayerData.append(player_string)
-        tempData[match_id] = tempPlayerData
-    else:
-        tempData[match_id] = [player_string]
-    
-    print("TempData:",tempData)
+    with conn:
+        cur.execute(f"INSERT INTO LOBBY (CODE, HOST, DATE, UUID) VALUES('{lobby_code}', '{host}', {unix_time}, '{unique_id}')")
+        primary_key = cur.lastrowid
+        cur.execute(f"INSERT INTO PARTICIPANTS (ID, PLAYER) VALUES({primary_key}, '{host}')")
         
-    tempSaveStorage(tempData)
+    cur.close()
     
+    return primary_key
+
+
+def show_code_db(primary_key, player_show):
+    cur = conn.cursor()
     
-def tempShowData(match_id):
-    tempData = tempLoadStorage()
-    player_data = tempData.get(match_id)
-    if(player_data):
-        return "\n".join(player_data)
-    else:
-        return "None"
+    with conn:
+        cur.execute(f"INSERT INTO PARTICIPANTS (ID, PLAYER) VALUES({primary_key}, '{player_show}')")
+        
+    cur.close() 
     
+
+def get_data_db():
+    cur = conn.cursor()
+    data = cur.execute("select l.code, group_concat(p.player, ', ') as players from lobby l left join participants p on l.id = p.id group by l.id")
+    match_data = list(data)
+    print(list(match_data))
+    cur.close()
+    return match_data
     
  
     

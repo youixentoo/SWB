@@ -26,7 +26,8 @@ conn.execute('''CREATE TABLE LOBBY
 conn.execute('''CREATE TABLE PARTICIPANTS
              (ID INTEGER,
               PLAYER TEXT NOT NULL,
-              FOREIGN KEY(ID) REFERENCES LOBBY(ID));''')
+              FOREIGN KEY(ID) REFERENCES LOBBY(ID),
+              UNIQUE(ID, PLAYER));''')
 
 """
 import sqlite3
@@ -43,8 +44,10 @@ def main():
     conn.close()
     
 def select_command(conn, cur):
+    # "select l.code, group_concat(p.player, ', ') as players from lobby l left join participants p on l.id = p.id and l.code = 'DGEHDS' group by l.id"
+    #  group by l.id
     
-    data = cur.execute("select l.code, group_concat(p.player, ', ') as players from lobby l left join participants p on l.id = p.id group by l.id")
+    data = cur.execute("select l.uuid, group_concat(p.player, ', ') as players from lobby l left join participants p on l.id = p.id where l.uuid = '032d17ed-8336-49fa-b51d-5b68bb36aec3'")
     print(list(data))
     
         

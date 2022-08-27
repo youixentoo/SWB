@@ -28,10 +28,10 @@ load_dotenv()
 
 token = os.getenv("TOKEN")
 guildIDS = [1009793614337024000]
-    
+
 intents = discord.Intents.default()
 intents.message_content = True
-      
+
 bot = commands.Bot(command_prefix='!', intents=intents)
 
 conn = sqlite3.connect('db/storage.db')
@@ -41,7 +41,7 @@ class ShowCodeButtonView(discord.ui.View): # Create a class called ShowCodeButto
         super().__init__(**kwargs, timeout=300) # I think it's in seconds
         self.code = code
         self.db_primary_key = db_primary_key
-        
+
     async def on_timeout(self):
         for child in self.children:
             child.disabled = True
@@ -54,10 +54,10 @@ class ShowCodeButtonView(discord.ui.View): # Create a class called ShowCodeButto
         show_code_db(self.db_primary_key, interaction.user)
         # tempSaveData(self.code, interaction.user)
         await interaction.response.send_message(content=self.code.upper(), ephemeral=True) # Send a message when the button is clicked
-        
-        
-     
-        
+
+
+
+
 # class SetEncoder(json.JSONEncoder):
 #     def default(self, obj):
 #        if isinstance(obj, set):
@@ -73,9 +73,12 @@ What to store in database:
         -- Point to primary key
     - Date created match - int --> unix time, using unixepoch() method
     - UUID - str
-    
+
     Table 1: Lobby
         Table 2: Participants
+        
+        
+TODO: Set up permissions orso
 
 """
 
@@ -84,8 +87,9 @@ What to store in database:
 async def on_ready():
     print(f"Logged in as {bot.user}")
     
-    
-@bot.command()
+# User command
+
+@bot.command(aliases=['lb', 'looby'])
 async def lobby(ctx, lobby_code, *args):
     message_unix_time = int(time.time())
     origin = ctx.message
@@ -101,46 +105,96 @@ async def lobby(ctx, lobby_code, *args):
     await ctx.send(view=ShowCodeButtonView(code=lobby_code, db_primary_key=db_primary_key), embed=embed)
     
     
+# Moderation commands
+
+
 @bot.command()
-async def getData(ctx, lobby_code):
-    match_data = get_data_db()
+async def getLobby(ctx, code):
+    if(len(code) == 6):
+        match_data = get_lobby_code_db(code)
+    elif(len(code) == 36):
+        match_data = get_uuid_code_db(code)
+
     await ctx.send(match_data)
     
     
-def lobby_creation_db(lobby_code, host, unix_time, unique_id):    
-    cur = conn.cursor()
+@bot.command()
+async def getLobbys(ctx, *codes):
+    if(len(codes[1]) == 6):
+        match_data = get_lobby_codes_db(codes)
+    elif(len(codes[1]) == 36):
+        match_data = get_uuid_codes_db(codes)
+
+    await ctx.send(match_data)
     
+    
+@bot.command()
+async def getPeriod(ctx, firstDate, secondDate=None):
+    # If second date is None --> get today until date given
+    pass
+
+
+def lobby_creation_db(lobby_code, host, unix_time, unique_id):
+    cur = conn.cursor()
+
     with conn:
         cur.execute(f"INSERT INTO LOBBY (CODE, HOST, DATE, UUID) VALUES('{lobby_code}', '{host}', {unix_time}, '{unique_id}')")
         primary_key = cur.lastrowid
         cur.execute(f"INSERT INTO PARTICIPANTS (ID, PLAYER) VALUES({primary_key}, '{host}')")
-        
+
     cur.close()
-    
+
     return primary_key
 
 
 def show_code_db(primary_key, player_show):
     cur = conn.cursor()
-    
-    with conn:
-        cur.execute(f"INSERT INTO PARTICIPANTS (ID, PLAYER) VALUES({primary_key}, '{player_show}')")
-        
-    cur.close() 
-    
 
-def get_data_db():
+    with conn:
+        try:
+            cur.execute(f"INSERT INTO PARTICIPANTS (ID, PLAYER) VALUES({primary_key}, '{player_show}')")
+        except sqlite3.IntegrityError as sql_IE:
+            pass
+
+    cur.close()
+
+
+def get_lobby_code_db(lobby_code):
     cur = conn.cursor()
-    data = cur.execute("select l.code, group_concat(p.player, ', ') as players from lobby l left join participants p on l.id = p.id group by l.id")
+    data = cur.execute(f"select l.code, group_concat(p.player, ', ') as players from lobby l left join participants p on l.id = p.id where l.code = '{lobby_code}'")
     match_data = list(data)
     print(list(match_data))
     cur.close()
     return match_data
-    
- 
-    
- 
-# Tests    
+
+
+def get_lobby_codes_db(lobby_codes):
+    pass
+
+
+
+def get_uuid_code_db(uuid_code):
+    cur = conn.cursor()
+    data = cur.execute(f"select l.uuid, group_concat(p.player, ', ') as players from lobby l left join participants p on l.id = p.id where l.uuid = '{uuid_code}'")
+    match_data = list(data)
+    print(list(match_data))
+    cur.close()
+    return match_data
+
+
+def get_uuid_codes_db(uuid_codes):
+    pass
+
+
+
+def get_period_db(start_date, end_date):
+    pass
+
+
+
+
+
+# Tests
 
 @bot.command()
 async def give(ctx, *args):
@@ -148,18 +202,18 @@ async def give(ctx, *args):
         title=f"{''.join(args)}",
         description="Embed desc.",
         color=discord.Colour.blurple(), # Pycord provides a class with default colors you can choose from
-    ) 
+    )
     await ctx.send(embed=embed) # Send the embed with some text
- 
+
 @bot.slash_command(guild_ids=guildIDS)
 async def ephem(ctx):
 
-    await ctx.send_response(content="Code", ephemeral=True)    
+    await ctx.send_response(content="Code", ephemeral=True)
 
 @bot.slash_command(guild_ids=guildIDS)
 async def hello(ctx):
     await ctx.respond("Hello!")
-    
+
 @bot.slash_command(guild_ids=guildIDS)
 # @option(
 #         "description",
@@ -171,10 +225,10 @@ async def embed(ctx, code: str):
         title=f"{code}",
         description="Embed desc.",
         color=discord.Colour.blurple(), # Pycord provides a class with default colors you can choose from
-    ) 
+    )
     await ctx.respond(embed=embed) # Send the embed with some text
- 
-# End of tests   
+
+# End of tests
 
 bot.run(token)
 

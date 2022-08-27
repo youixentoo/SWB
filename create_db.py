@@ -15,6 +15,8 @@ What to store in database:
     
     Table 1: Lobby
         Table 2: Participants
+        
+PRAGMA foreign_keys = ON;
 
 """
 
@@ -25,8 +27,10 @@ conn = sqlite3.connect('db/storage.db')
 cur = conn.cursor()
 print("Opened database successfully");
 
+cur.execute("PRAGMA foreign_keys = ON")
+
 cur.execute('''CREATE TABLE LOBBY
-             (ID INTEGER PRIMARY KEY AUTOINCREMENT,
+              (ID INTEGER PRIMARY KEY AUTOINCREMENT,
               CODE TEXT NOT NULL,
               HOST TEXT NOT NULL,
               DATE INTEGER NOT NULL,
@@ -35,7 +39,8 @@ cur.execute('''CREATE TABLE LOBBY
 cur.execute('''CREATE TABLE PARTICIPANTS
              (ID INTEGER,
               PLAYER TEXT NOT NULL,
-              FOREIGN KEY(ID) REFERENCES LOBBY(ID));''')
+              FOREIGN KEY(ID) REFERENCES LOBBY(ID),
+              UNIQUE(ID, PLAYER));''')
          
 conn.commit()
          

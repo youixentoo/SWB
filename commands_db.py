@@ -31,6 +31,9 @@ conn.execute('''CREATE TABLE PARTICIPANTS
 
 """
 import sqlite3
+import time
+import datetime
+import dateparser
 
 def main():
     conn = sqlite3.connect('db/storage.db')
@@ -44,10 +47,31 @@ def main():
     conn.close()
     
 def select_command(conn, cur):
-    # "select l.code, group_concat(p.player, ', ') as players from lobby l left join participants p on l.id = p.id and l.code = 'DGEHDS' group by l.id"
+    # "select l.code, group_concat(p.player, ', ') from lobby l left join participants p on l.id = p.id and l.code = 'DGEHDS' group by l.id"
     #  group by l.id
+    argument = "28 8 2022"
     
-    data = cur.execute("select l.uuid, group_concat(p.player, ', ') as players from lobby l left join participants p on l.id = p.id where l.uuid = '032d17ed-8336-49fa-b51d-5b68bb36aec3'")
+    if(argument[-1] == "m"):
+        datestr = f"{argument[:-1]} min ago"
+    elif(argument[-1] == "h"):
+        datestr = f"{argument[:-1]} hours ago"
+    elif(argument[-1] == "d"):
+        datestr = f"{argument[:-1]} days ago"
+    else:
+        datestr = argument
+        
+    
+    
+    dt = dateparser.parse(datestr, settings={'DATE_ORDER': 'MDY'})
+    print(dt)    
+    
+    # dt = datetime.datetime(2022, 8, 27) #y, m, d
+    dt2 = datetime.datetime(2022, 8, 28) #y, m, d
+    unix_time = int(dt.timestamp())
+    # unix_time2 = int(dt2.timestamp())
+    unix_time2 = int(time.time())
+    
+    data = cur.execute(f"select l.code, group_concat(p.player, ', ') from lobby l left join participants p on l.id = p.id where l.date > {unix_time} and l.date < {unix_time2} group by l.id")
     print(list(data))
     
         

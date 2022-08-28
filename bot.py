@@ -9,6 +9,8 @@ nest_asyncio.apply()
 
 import os
 import time
+import datetime
+import dateparser
 import sqlite3
 import logging
 import discord
@@ -76,9 +78,10 @@ What to store in database:
 
     Table 1: Lobby
         Table 2: Participants
-        
-        
+
+
 TODO: Set up permissions orso
+TODO: Option for output to be formatted or as export or something
 
 """
 
@@ -86,7 +89,7 @@ TODO: Set up permissions orso
 @bot.event
 async def on_ready():
     print(f"Logged in as {bot.user}")
-    
+
 # User command
 
 @bot.command(aliases=['lb', 'looby'])
@@ -103,8 +106,8 @@ async def lobby(ctx, lobby_code, *args):
     db_primary_key = lobby_creation_db(lobby_code.upper(), host, message_unix_time, unique_id)
     await origin.delete() # Deletes the command message
     await ctx.send(view=ShowCodeButtonView(code=lobby_code, db_primary_key=db_primary_key), embed=embed)
-    
-    
+
+
 # Moderation commands
 
 
@@ -114,24 +117,32 @@ async def getLobby(ctx, code):
         match_data = get_lobby_code_db(code)
     elif(len(code) == 36):
         match_data = get_uuid_code_db(code)
+    else:
+        match_data = "None"
 
     await ctx.send(match_data)
-    
-    
+
+
 @bot.command()
 async def getLobbys(ctx, *codes):
     if(len(codes[1]) == 6):
         match_data = get_lobby_codes_db(codes)
     elif(len(codes[1]) == 36):
         match_data = get_uuid_codes_db(codes)
-
+    else:
+        match_data = "None"
+        
     await ctx.send(match_data)
-    
-    
+
+
 @bot.command()
-async def getPeriod(ctx, firstDate, secondDate=None):
-    # If second date is None --> get today until date given
-    pass
+async def getPeriod(ctx, firstArg, secondArg=None):
+    if(secondArg):
+        match_data = get_unix_double(firstArg, secondArg)
+    else:
+        match_data = get_unix_single(firstArg)
+        
+    await ctx.send(match_data)
 
 
 def lobby_creation_db(lobby_code, host, unix_time, unique_id):
@@ -161,7 +172,7 @@ def show_code_db(primary_key, player_show):
 
 def get_lobby_code_db(lobby_code):
     cur = conn.cursor()
-    data = cur.execute(f"select l.code, group_concat(p.player, ', ') as players from lobby l left join participants p on l.id = p.id where l.code = '{lobby_code}'")
+    data = cur.execute(f"select l.code, group_concat(p.player, ', ') from lobby l left join participants p on l.id = p.id where l.code = '{lobby_code}'")
     match_data = list(data)
     print(list(match_data))
     cur.close()
@@ -175,7 +186,7 @@ def get_lobby_codes_db(lobby_codes):
 
 def get_uuid_code_db(uuid_code):
     cur = conn.cursor()
-    data = cur.execute(f"select l.uuid, group_concat(p.player, ', ') as players from lobby l left join participants p on l.id = p.id where l.uuid = '{uuid_code}'")
+    data = cur.execute(f"select l.uuid, group_concat(p.player, ', ') from lobby l left join participants p on l.id = p.id where l.uuid = '{uuid_code}'")
     match_data = list(data)
     print(list(match_data))
     cur.close()
@@ -186,49 +197,39 @@ def get_uuid_codes_db(uuid_codes):
     pass
 
 
+def get_unix_single(argument):
+    if(argument[-1] == "m"):
+        datestr = f"{argument[:-1]} min ago"
+    elif(argument[-1] == "h"):
+        datestr = f"{argument[:-1]} hours ago"
+    elif(argument[-1] == "d"):
+        datestr = f"{argument[:-1]} days ago"
+    else:
+        datestr = argument
+        
+    dt = dateparser.parse(datestr, settings={'DATE_ORDER': 'MDY'})
+    unix_start = int(dt.timestamp())
+    unix_end = int(time.time())
+    return get_period_db(unix_start, unix_end)
+    
+    
+def get_unix_double(arg1, arg2):
+    dt1 = dateparser.parse(arg1, settings={'DATE_ORDER': 'MDY'})
+    dt2 = dateparser.parse(arg2, settings={'DATE_ORDER': 'MDY'})
+    
+    unix_start = int(dt1.timestamp())
+    unix_end = int(dt2.timestamp())
+    return get_period_db(unix_start, unix_end)
 
-def get_period_db(start_date, end_date):
-    pass
 
+def get_period_db(unix_start, unix_end):    
+    cur = conn.cursor()
+    data = cur.execute(f"select l.code, group_concat(p.player, ', ') from lobby l left join participants p on l.id = p.id where l.date > {unix_start} and l.date < {unix_end} group by l.id")
+    match_data = list(data)
+    print(list(match_data))
+    cur.close()
+    return match_data
 
-
-
-
-# Tests
-
-@bot.command()
-async def give(ctx, *args):
-    embed = discord.Embed(
-        title=f"{''.join(args)}",
-        description="Embed desc.",
-        color=discord.Colour.blurple(), # Pycord provides a class with default colors you can choose from
-    )
-    await ctx.send(embed=embed) # Send the embed with some text
-
-@bot.slash_command(guild_ids=guildIDS)
-async def ephem(ctx):
-
-    await ctx.send_response(content="Code", ephemeral=True)
-
-@bot.slash_command(guild_ids=guildIDS)
-async def hello(ctx):
-    await ctx.respond("Hello!")
-
-@bot.slash_command(guild_ids=guildIDS)
-# @option(
-#         "description",
-#         description="Embed description",
-#         required=True
-# )
-async def embed(ctx, code: str):
-    embed = discord.Embed(
-        title=f"{code}",
-        description="Embed desc.",
-        color=discord.Colour.blurple(), # Pycord provides a class with default colors you can choose from
-    )
-    await ctx.respond(embed=embed) # Send the embed with some text
-
-# End of tests
 
 bot.run(token)
 

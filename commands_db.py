@@ -40,7 +40,7 @@ def main():
     cur = conn.cursor()
     print("Opened database successfully");
     
-    # show_code_command(1, cur, conn)
+    # show_code_command(cur, conn)
     select_command(conn, cur)
     
     cur.close()
@@ -49,7 +49,12 @@ def main():
 def select_command(conn, cur):
     # "select l.code, group_concat(p.player, ', ') from lobby l left join participants p on l.id = p.id and l.code = 'DGEHDS' group by l.id"
     #  group by l.id
-    argument = "28 8 2022"
+    argument = "20h"
+    lobby_code = "GTHDMA"
+    mult_codes = ('4d7d6085-49af-43ad-8ea7-2ae20e3b6e9a', '43c34947-bf6c-49ec-804f-8e998d09d549')
+    
+    print(mult_codes)
+    print(type(mult_codes))
     
     if(argument[-1] == "m"):
         datestr = f"{argument[:-1]} min ago"
@@ -60,18 +65,14 @@ def select_command(conn, cur):
     else:
         datestr = argument
         
-    
-    
     dt = dateparser.parse(datestr, settings={'DATE_ORDER': 'MDY'})
-    print(dt)    
+    unix_start = int(dt.timestamp())
+    unix_end = int(time.time())
+        
     
-    # dt = datetime.datetime(2022, 8, 27) #y, m, d
-    dt2 = datetime.datetime(2022, 8, 28) #y, m, d
-    unix_time = int(dt.timestamp())
-    # unix_time2 = int(dt2.timestamp())
-    unix_time2 = int(time.time())
-    
-    data = cur.execute(f"select l.code, group_concat(p.player, ', ') from lobby l left join participants p on l.id = p.id where l.date > {unix_time} and l.date < {unix_time2} group by l.id")
+    # data = cur.execute(f"select l.code, group_concat(p.player, ', '), group_concat(p.playerid, ', ') from lobby l left join participants p on l.id = p.id where l.date > {unix_start} and l.date < {unix_end} group by l.id")
+    # data = cur.execute(f"select l.code, group_concat(p.player || '; ' || p.playerid, ', ') from lobby l left join participants p on l.id = p.id where l.code = '{lobby_code}'")
+    data = cur.execute(f"select l.code, group_concat(p.player, ', ') from lobby l left join participants p on l.id = p.id where l.uuid in {mult_codes} group by l.id")
     print(list(data))
     
         
@@ -90,17 +91,19 @@ def lobby_creation_command(cur, conn):
     
     conn.commit()
     
-def show_code_command(primary_key, cur, conn):
+def show_code_command(cur, conn, primary_key=1):
     player_show = "other#0001"
+    player_id = 48606
+    
     with conn:
-        command = f"INSERT INTO PARTICIPANTS (ID, PLAYER) VALUES({primary_key}, '{player_show}')"
+        command = f"INSERT INTO PARTICIPANTS (ID, PLAYER, PLAYERID) VALUES({primary_key}, '{player_show}', '{player_id}')"
         conn.execute(command)
-        print(conn.lastrowid)
+        # print(conn.lastrowid)
     
     print(command)
-    # cur.execute(command)
+    cur.execute(command)
 
-    # conn.commit()
+    conn.commit()
 
 
 if __name__ == "__main__":

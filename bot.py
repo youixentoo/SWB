@@ -22,6 +22,7 @@ import sqlite3
 import logging
 import discord
 from uuid import uuid4
+from discord import guild_only, default_permissions
 from discord.ext import commands
 from discord.commands import option
 from dotenv import load_dotenv
@@ -36,11 +37,13 @@ load_dotenv()
 
 token = os.getenv("TOKEN")
 guildIDS = [1009793614337024000]
+modRoleIDS = [760402578218418201, 760402578218418202, 783625463334567966, 964096541906317392, 1015684635524608040] # Mod, Admin, Head admin, Shogun; Test role in testing server
 
 intents = discord.Intents.default()
 intents.message_content = True
 
-bot = commands.Bot(command_prefix='!', intents=intents)
+# bot = commands.Bot(command_prefix='!', intents=intents)
+bot = discord.Bot(intents=intents)
 
 conn = sqlite3.connect('db/storage.db')
 
@@ -82,15 +85,33 @@ class ShowCodeButtonView(discord.ui.View): # Create a class called ShowCodeButto
             await interaction.response.send_message(content="You're not the host of this match and therefore don't have permission to close it", ephemeral=True) # Send a message when the button is clicked
 
 
+# Bot events
 
 @bot.event
 async def on_ready():
     print(f"Logged in as {bot.user}")
+    
+
+@bot.event
+async def on_command_error(ctx: discord.ApplicationContext, error: discord.DiscordException):
+    if isinstance(error, commands.MissingAnyRole):
+        await ctx.respond("You don't have access to this command", ephemeral=True)
+    else:
+        raise error
+        
+        
+@bot.event
+async def on_application_command_error(ctx: discord.ApplicationContext, error: discord.DiscordException):
+    if isinstance(error, commands.MissingAnyRole):
+        await ctx.respond("You don't have access to this command", ephemeral=True)
+    else:
+        raise error
 
 
 # User command
 
 @bot.slash_command(guild_ids=guildIDS, description="Create a lobby for other players to join")
+# @commands.has_role(*modRoleIDS)
 @option(
         "code",
         description="6 letter match code",
@@ -164,6 +185,8 @@ async def lobby(ctx: discord.ApplicationContext, code: str, description: str):
 
 # /getlobby
 @bot.slash_command(guild_ids=guildIDS, description="Retrieve data from a lobby using either the lobby code or the lobby id")
+@commands.has_any_role(*modRoleIDS)
+@guild_only()
 @option(
         "code",
         description="Lobby code or lobby id",
@@ -205,6 +228,8 @@ async def getlobby(ctx: discord.ApplicationContext, code: str, include_pid:bool=
 
 # /getlobbys
 @bot.slash_command(guild_ids=guildIDS, description="Retrieve data from multiple lobbies at once. Only ever search 1 type of code at once.")
+@commands.has_any_role(*modRoleIDS)
+@guild_only()
 @option(
         "codes",
         description="Multiple lobby codes or lobby ids, seperated with a space",
@@ -240,9 +265,11 @@ async def getlobbys(ctx: discord.ApplicationContext, codes: str):
 
 # /getperiod
 @bot.slash_command(guild_ids=guildIDS, description="Retrieve lobbies from a specified time period. Retrieves from now until specified without a2. (DMY)")
+@commands.has_any_role(*modRoleIDS)
+@guild_only()
 @option(
         "a1",
-        description="First date, also supports 20m, 3h, or 5d",
+        description="First date, also supports for example: 20m, 3h, or 5d",
         required=True)
 @option(
         "a2",

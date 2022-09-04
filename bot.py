@@ -7,22 +7,20 @@ Created on Sun Aug 14 11:02:45 2022
 List of things to do in order
 TODO: Feedback
 TODO: Duplicate lobby codes
-
-TODO: Set up permissions orso --> you can do this in server settings
-
 """
+
 import nest_asyncio
 nest_asyncio.apply()
 
 import os
+import csv
 import time
-import datetime
 import dateparser
 import sqlite3
 import logging
 import discord
 from uuid import uuid4
-from discord import guild_only, default_permissions
+from discord import guild_only
 from discord.ext import commands
 from discord.commands import option
 from dotenv import load_dotenv
@@ -44,14 +42,13 @@ intents.message_content = True
 
 # bot = commands.Bot(command_prefix='!', intents=intents)
 bot = discord.Bot(intents=intents)
-
 conn = sqlite3.connect('db/storage.db')
 
 
 class ShowCodeButtonView(discord.ui.View): # Create a class called ShowCodeButtonView that subclasses discord.ui.View
     """
     Class that subclasses discord.ui.View
-    
+
     Adds 2 buttons. One shows the lobby code, to only the user that pressed the button.
     The other button closes the match (removes all buttons), only the person who hosts can do this.
     The match gets closes automatically after 300 seconds (5 min)
@@ -65,7 +62,7 @@ class ShowCodeButtonView(discord.ui.View): # Create a class called ShowCodeButto
 
     async def on_timeout(self):
         if not(self.disabled):
-            self.clear_items() 
+            self.clear_items()
         return
 
         # await self.message.edit(view=self) # content="Time limit reached, joining match disabled",
@@ -90,7 +87,7 @@ class ShowCodeButtonView(discord.ui.View): # Create a class called ShowCodeButto
 @bot.event
 async def on_ready():
     print(f"Logged in as {bot.user}")
-    
+
 
 @bot.event
 async def on_command_error(ctx: discord.ApplicationContext, error: discord.DiscordException):
@@ -98,8 +95,8 @@ async def on_command_error(ctx: discord.ApplicationContext, error: discord.Disco
         await ctx.respond("You don't have access to this command", ephemeral=True)
     else:
         raise error
-        
-        
+
+
 @bot.event
 async def on_application_command_error(ctx: discord.ApplicationContext, error: discord.DiscordException):
     if isinstance(error, commands.MissingAnyRole):
@@ -135,14 +132,14 @@ async def lobby(ctx: discord.ApplicationContext, code: str, description: str):
 
     Returns
     -------
-    Embed with the name of the host and UUID of the match. Underneath it shows 2 buttons, one to show the lobby code, 
+    Embed with the name of the host and UUID of the match. Underneath it shows 2 buttons, one to show the lobby code,
     the other is used to close the match by the person who hosted.
 
     """
     if(len(code) != 6 or not code.isalpha()):
         await ctx.respond(content=f"Invalid lobby code: {code}", ephemeral=True)
         return
-    
+
     message_unix_time = int(time.time())
     unique_id = uuid4()
     embed = discord.Embed(
@@ -153,32 +150,6 @@ async def lobby(ctx: discord.ApplicationContext, code: str, description: str):
     db_primary_key = lobby_creation_db(code.upper(), ctx.user, ctx.user.id, message_unix_time, unique_id)
     await ctx.delete()
     await ctx.respond(view=ShowCodeButtonView(code=code, db_primary_key=db_primary_key, host=ctx.user), embed=embed)
-
-
-# @bot.command(aliases=['lbb', 'looby'])
-# async def lobby(ctx: discord.ApplicationContext, lobby_code=None, *args):
-#     if not(lobby_code):
-#         await ctx.reply(content="Example usage: !lobby ABCDEF NM pods")
-#         return
-
-#     message_unix_time = int(time.time())
-#     origin = ctx.message
-
-#     if(len(lobby_code) != 6):
-#         await ctx.reply(content="Invalid lobby code")
-#         return
-#     else:
-#         await origin.delete() # Deletes the command message
-
-#     host = f"{origin.author.name}#{origin.author.discriminator}"
-#     unique_id = uuid4()
-#     embed = discord.Embed(
-#         title=f"{' '.join(args)}",
-#         description=f"Match hosted by: {host}\nID: {unique_id}",
-#         color=discord.Colour.blurple(), # Pycord provides a class with default colors you can choose from
-#     )
-#     db_primary_key = lobby_creation_db(lobby_code.upper(), host, origin.author.id, message_unix_time, unique_id)
-#     await ctx.send(view=ShowCodeButtonView(code=lobby_code, db_primary_key=db_primary_key, host=host), embed=embed)
 
 
 # Moderation commands
@@ -199,7 +170,7 @@ async def lobby(ctx: discord.ApplicationContext, code: str, description: str):
         default=False)
 async def getlobby(ctx: discord.ApplicationContext, code: str, include_pid:bool=False):
     """
-    Staff command to search the database for single lobby codes. 
+    Staff command to search the database for single lobby codes.
     To be used with either the 6 letter codes or the 36 character UUID.
     Optionally, you can include a bool to add the user id of the players to the output.
 
@@ -221,9 +192,18 @@ async def getlobby(ctx: discord.ApplicationContext, code: str, include_pid:bool=
     elif(len(code) == 36):
         match_data = get_uuid_code_db(code, include_pid)
     else:
-        match_data = "None"
+        await ctx.respond("None")
+        return
+    
+    lobby, host, date, *participants = match_data
+        
+    embed = discord.Embed(
+        title=f"Code: {lobby}",
+        description=f"**Host:** {host}\n**Participants:** {', '.join(participants)}\n**Date:** <t:{date}>",
+        color=discord.Colour.blurple(), # Pycord provides a class with default colors you can choose from
+    )
 
-    await ctx.respond(match_data)
+    await ctx.respond(embed=embed)
 
 
 # /getlobbys
@@ -237,7 +217,7 @@ async def getlobby(ctx: discord.ApplicationContext, code: str, include_pid:bool=
         )
 async def getlobbys(ctx: discord.ApplicationContext, codes: str):
     """
-    Staff command to search the database for multiple lobby codes. 
+    Staff command to search the database for multiple lobby codes.
     To be used with either the 6 letter codes or the 36 character UUIDs.
 
     Parameters
@@ -247,20 +227,22 @@ async def getlobbys(ctx: discord.ApplicationContext, codes: str):
 
     Returns
     -------
-    Data from the matches
+    Data from the matches as a .tsv file.
 
     """
-    t_codes = tuple(codes.split(" ")) 
+    t_codes = tuple(codes.split(" "))
     sum_l = sum(map(lambda c: len(c), codes.split(" ")))
 
     if(sum_l / len(t_codes) == 6):
-        match_data = get_lobby_codes_db(t_codes)
+        get_lobby_codes_db(t_codes)
     elif(sum_l / len(t_codes) == 36):
-        match_data = get_uuid_codes_db(t_codes)
+        get_uuid_codes_db(t_codes)
     else:
-        match_data = "Invalid search"
-
-    await ctx.respond(match_data)
+        await ctx.respond("Invalid search")
+        return
+    
+    response = discord.File("files/lobby_data.txt")
+    await ctx.respond(file=response)
 
 
 # /getperiod
@@ -278,8 +260,8 @@ async def getlobbys(ctx: discord.ApplicationContext, codes: str):
         default=None)
 async def getperiod(ctx: discord.ApplicationContext, a1: str, a2: str=None):
     """
-    Staff command to search the database for lobby codes. 
-    This command is based on time/dates. 
+    Staff command to search the database for lobby codes.
+    This command is based on time/dates.
 
     Parameters
     ----------
@@ -290,15 +272,16 @@ async def getperiod(ctx: discord.ApplicationContext, a1: str, a2: str=None):
 
     Returns
     -------
-    Date from the matches.
+    Data from the matches as a .tsv file.
 
     """
     if(a2):
-        match_data = get_unix_double(a1, a2)
+        get_unix_double(a1, a2)
     else:
-        match_data = get_unix_single(a1)
-
-    await ctx.respond(match_data)
+        get_unix_single(a1)
+        
+    response = discord.File("files/lobby_data.txt")
+    await ctx.respond(file=response)
 
 
 # From here on it's database related functions
@@ -334,18 +317,27 @@ def show_code_db(primary_key, player_show):
             pass
 
     cur.close()
+
+
+"""
+Formats the output data to tsv to be opened in excel.
+In order for discord to preview it, it gets saved as .txt.
+"""
+def format_output(sql_data):
+    with open("files/lobby_data.txt", "w", newline="") as tsv_file:
+        tsv_writer = csv.writer(tsv_file, delimiter='\t')
+        tsv_writer.writerow(("Unix", "Code", "Host", "Participants"))
+        tsv_writer.writerows(to_tsv(sql_data))
+        
     
 """
-Formats the output data
-
-TODO: implement
-""" 
-def format_output(sql_data):
-    data = list(sql_data)
-    print(data)
-    
-    return data
-
+Generator for conversion of the data from sql to tsv.
+A generator is used so the entire return of data doesn't get loaded into ram.
+"""
+def to_tsv(T):
+    for x in T:
+        a,b,c,joined = x
+        yield (a, b, c, *joined.split("\t"))
 
 """
 Retrieve data from 1 lobby based on a lobby code
@@ -353,12 +345,12 @@ Retrieve data from 1 lobby based on a lobby code
 def get_lobby_code_db(lobby_code, include_pid):
     cur = conn.cursor()
     if include_pid:
-        data = cur.execute(f"select l.code, group_concat(p.player || '; ' || p.playerid, ', ') from lobby l left join participants p on l.id = p.id where l.code = '{lobby_code}'")
+        data = cur.execute(f"select l.code, l.host, l.date, group_concat(p.player || '; ' || p.playerid, ', ') from lobby l left join participants p on l.id = p.id where l.code = '{lobby_code}'")
     else:
-        data = cur.execute(f"select l.code, group_concat(p.player, ', ') from lobby l left join participants p on l.id = p.id where l.code = '{lobby_code}'")
-    formatted = format_output(data)
+        data = cur.execute(f"select l.code, l.host, l.date, group_concat(p.player, ', ') from lobby l left join participants p on l.id = p.id where l.code = '{lobby_code}'")
+    l_data = list(data)[0]
     cur.close()
-    return formatted
+    return l_data
 
 
 """
@@ -366,10 +358,9 @@ Retrieve data based on multiple lobby codes
 """
 def get_lobby_codes_db(lobby_codes):
     cur = conn.cursor()
-    data = cur.execute(f"select l.code, group_concat(p.player, ', ') from lobby l left join participants p on l.id = p.id where l.code in {lobby_codes} group by l.id")
-    formatted = format_output(data)
+    data = cur.execute(f"select l.date, l.code, l.host, group_concat(p.player, '\t') from lobby l left join participants p on l.id = p.id where l.code in {lobby_codes} group by l.id")
+    format_output(data)
     cur.close()
-    return formatted
 
 
 """
@@ -378,12 +369,12 @@ Retrieve data from 1 lobby based on a UUID
 def get_uuid_code_db(uuid_code, include_pid):
     cur = conn.cursor()
     if include_pid:
-        data = cur.execute(f"select l.uuid, group_concat(p.player || '; ' || p.playerid, ', ') from lobby l left join participants p on l.id = p.id where l.uuid = '{uuid_code}'")
+        data = cur.execute(f"select l.uuid, l.host, l.date, group_concat(p.player || '; ' || p.playerid, ', ') from lobby l left join participants p on l.id = p.id where l.uuid = '{uuid_code}'")
     else:
-        data = cur.execute(f"select l.uuid, group_concat(p.player, ', ') from lobby l left join participants p on l.id = p.id where l.uuid = '{uuid_code}'")
-    formatted = format_output(data)
+        data = cur.execute(f"select l.uuid, l.host, l.date, group_concat(p.player, ', ') from lobby l left join participants p on l.id = p.id where l.uuid = '{uuid_code}'")
+    l_data = list(data)[0]
     cur.close()
-    return formatted
+    return l_data
 
 
 """
@@ -391,10 +382,9 @@ Retrieve data based on multiple UUIDs
 """
 def get_uuid_codes_db(uuid_codes):
     cur = conn.cursor()
-    data = cur.execute(f"select l.code, group_concat(p.player, ', ') from lobby l left join participants p on l.id = p.id where l.uuid in {uuid_codes} group by l.id")
-    formatted = format_output(data)
+    data = cur.execute(f"select l.date, l.code, l.host, group_concat(p.player, '\t') from lobby l left join participants p on l.id = p.id where l.uuid in {uuid_codes} group by l.id")
+    format_output(data)
     cur.close()
-    return formatted
 
 
 """
@@ -434,13 +424,9 @@ Date selection database query
 """
 def get_period_db(unix_start, unix_end):
     cur = conn.cursor()
-    data = cur.execute(f"select l.code, group_concat(p.player, ', ') from lobby l left join participants p on l.id = p.id where l.date > {unix_start} and l.date < {unix_end} group by l.id")
-    formatted = format_output(data)
+    data = cur.execute(f"select l.date, l.code, l.host, group_concat(p.player, '\t') from lobby l left join participants p on l.id = p.id where l.date > {unix_start} and l.date < {unix_end} group by l.id")
+    format_output(data)
     cur.close()
-    return formatted
 
 
 bot.run(token)
-
-
-# https://support.discord.com/hc/en-us/articles/1500000580222

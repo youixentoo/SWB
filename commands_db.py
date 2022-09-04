@@ -34,6 +34,7 @@ import sqlite3
 import time
 import datetime
 import dateparser
+import csv
 
 def main():
     conn = sqlite3.connect('db/storage.db')
@@ -49,12 +50,9 @@ def main():
 def select_command(conn, cur):
     # "select l.code, group_concat(p.player, ', ') from lobby l left join participants p on l.id = p.id and l.code = 'DGEHDS' group by l.id"
     #  group by l.id
-    argument = "20h"
-    lobby_code = "GTHDMA"
-    mult_codes = ('4d7d6085-49af-43ad-8ea7-2ae20e3b6e9a', '43c34947-bf6c-49ec-804f-8e998d09d549')
-    
-    print(mult_codes)
-    print(type(mult_codes))
+    argument = "48h"
+    # lobby_code = "GTHDMA"
+    # mult_codes = ('4d7d6085-49af-43ad-8ea7-2ae20e3b6e9a', '43c34947-bf6c-49ec-804f-8e998d09d549')
     
     if(argument[-1] == "m"):
         datestr = f"{argument[:-1]} min ago"
@@ -70,11 +68,27 @@ def select_command(conn, cur):
     unix_end = int(time.time())
         
     
-    # data = cur.execute(f"select l.code, group_concat(p.player, ', '), group_concat(p.playerid, ', ') from lobby l left join participants p on l.id = p.id where l.date > {unix_start} and l.date < {unix_end} group by l.id")
+    data = cur.execute(f"select l.date, l.code, l.host, group_concat(p.player, '\t') from lobby l left join participants p on l.id = p.id where l.date > {unix_start} and l.date < {unix_end} group by l.id")
     # data = cur.execute(f"select l.code, group_concat(p.player || '; ' || p.playerid, ', ') from lobby l left join participants p on l.id = p.id where l.code = '{lobby_code}'")
-    data = cur.execute(f"select l.code, group_concat(p.player, ', ') from lobby l left join participants p on l.id = p.id where l.uuid in {mult_codes} group by l.id")
-    print(list(data))
+    # data = cur.execute(f"select l.code, group_concat(p.player, ', ') from lobby l left join participants p on l.id = p.id where l.uuid in {mult_codes} group by l.id")
+    foramtted = format_output(data)
     
+    
+def format_output(sql_data):
+    with open("files/lobby_data.tsv", "w", newline="") as tsv_file:
+        tsv_writer = csv.writer(tsv_file, delimiter='\t')
+        tsv_writer.writerow(("Unix", "Code", "Host", "Participants"))
+        tsv_writer.writerows(to_tsv(sql_data))
+        
+    
+"""
+Generator for conversion of the data from sql to tsv.
+A generator is used so the entire return of data doesn't get loaded into ram.
+"""
+def to_tsv(T):
+    for x in T:
+        a,b,c,joined = x
+        yield (a, b, c, *joined.split("\t"))
         
 
 def lobby_creation_command(cur, conn):

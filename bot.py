@@ -145,7 +145,7 @@ async def lobby(ctx: discord.ApplicationContext, code: str, description: str):
     unique_id = uuid4()
     embed = discord.Embed(
         title=description,
-        description=f"Match hosted by: {ctx.user}\nID: {unique_id}",
+        description=f"**Host:** {ctx.user}\n**ID:** `{unique_id}`",
         color=discord.Colour.blurple(), # Pycord provides a class with default colors you can choose from
     )
     db_primary_key = lobby_creation_db(code.upper(), ctx.user, ctx.user.id, message_unix_time, unique_id)

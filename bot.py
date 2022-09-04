@@ -359,7 +359,6 @@ Retrieve data based on multiple lobby codes
 """
 def get_lobby_codes_db(lobby_codes):
     upper_codes = tuple(map(str.upper, lobby_codes))
-    print(upper_codes)
     cur = conn.cursor()
     data = cur.execute(f"select l.date, l.code, l.host, group_concat(p.player, '\t') from lobby l left join participants p on l.id = p.id where l.code in {upper_codes} group by l.id")
     format_output(data)

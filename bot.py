@@ -7,6 +7,7 @@ Created on Sun Aug 14 11:02:45 2022
 List of things to do in order
 TODO: Feedback
 TODO: Duplicate lobby codes
+TODO: Exception ignored in: <function _ProactorBasePipeTransport.__del__ at 0x00000200BFFD31F0>
 """
 
 import nest_asyncio
@@ -188,15 +189,15 @@ async def getlobby(ctx: discord.ApplicationContext, code: str, include_pid:bool=
     """
     # Check for length of the code to determine the type of code to search the database for.
     if(len(code) == 6):
-        match_data = get_lobby_code_db(code, include_pid)
+        match_data = get_lobby_code_db(code.upper(), include_pid)
     elif(len(code) == 36):
         match_data = get_uuid_code_db(code, include_pid)
     else:
         await ctx.respond("None")
         return
-    
+
     lobby, host, date, *participants = match_data
-        
+
     embed = discord.Embed(
         title=f"Code: {lobby}",
         description=f"**Host:** {host}\n**Participants:** {', '.join(participants)}\n**Date:** <t:{date}>",
@@ -240,7 +241,7 @@ async def getlobbys(ctx: discord.ApplicationContext, codes: str):
     else:
         await ctx.respond("Invalid search")
         return
-    
+
     response = discord.File("files/lobby_data.txt")
     await ctx.respond(file=response)
 
@@ -279,7 +280,7 @@ async def getperiod(ctx: discord.ApplicationContext, a1: str, a2: str=None):
         get_unix_double(a1, a2)
     else:
         get_unix_single(a1)
-        
+
     response = discord.File("files/lobby_data.txt")
     await ctx.respond(file=response)
 
@@ -328,8 +329,8 @@ def format_output(sql_data):
         tsv_writer = csv.writer(tsv_file, delimiter='\t')
         tsv_writer.writerow(("Unix", "Code", "Host", "Participants"))
         tsv_writer.writerows(to_tsv(sql_data))
-        
-    
+
+
 """
 Generator for conversion of the data from sql to tsv.
 A generator is used so the entire return of data doesn't get loaded into ram.
@@ -357,8 +358,10 @@ def get_lobby_code_db(lobby_code, include_pid):
 Retrieve data based on multiple lobby codes
 """
 def get_lobby_codes_db(lobby_codes):
+    upper_codes = tuple(map(str.upper, lobby_codes))
+    print(upper_codes)
     cur = conn.cursor()
-    data = cur.execute(f"select l.date, l.code, l.host, group_concat(p.player, '\t') from lobby l left join participants p on l.id = p.id where l.code in {lobby_codes} group by l.id")
+    data = cur.execute(f"select l.date, l.code, l.host, group_concat(p.player, '\t') from lobby l left join participants p on l.id = p.id where l.code in {upper_codes} group by l.id")
     format_output(data)
     cur.close()
 

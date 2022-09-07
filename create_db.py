@@ -7,14 +7,14 @@ Created on Thu Aug 25 13:38:00 2022
 What to store in database:
     - 'Primary key'
     - Lobby code (TGHTYF) - str
-    - Host (youixentoo#6937) - str
+    - Host - userid - str
     - Date created match - int --> unix time, using unixepoch() method
     - UUID - str
     - List of players - 1-to-many # https://www.reddit.com/r/learnpython/comments/93cief/how_to_store_a_list_in_one_sqlite3_column/
         -- Point to primary key
     
     Table 1: Lobby
-        Table 2: Participants
+        Table 2: Participants -->user ids
         
 PRAGMA foreign_keys = ON;
 
@@ -39,9 +39,8 @@ cur.execute('''CREATE TABLE LOBBY
 cur.execute('''CREATE TABLE PARTICIPANTS
              (ID INTEGER,
               PLAYER TEXT NOT NULL,
-              PLAYERID TEXT NOT NULL,
               FOREIGN KEY(ID) REFERENCES LOBBY(ID),
-              UNIQUE(ID, PLAYERID));''')
+              UNIQUE(ID, PLAYER));''')
          
 conn.commit()
          

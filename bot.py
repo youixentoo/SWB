@@ -4,27 +4,33 @@ Created on Sun Aug 14 11:02:45 2022
 
 @author: youixentoo
 
+Restrict access in server settings
+
 List of things to do in order
 TODO: Feedback
-TODO: ApplicationCommandInvokeError to be per command instead of global
-TODO: Exception ignored in: <function _ProactorBasePipeTransport.__del__ at 0x00000200BFFD31F0>
+TODO: Error handling
+    TODO: ApplicationCommandInvokeError to be per command instead of global
+    TODO: Exception ignored in: <function _ProactorBasePipeTransport.__del__ at 0x00000200BFFD31F0>
+
 """
 
 import nest_asyncio
 nest_asyncio.apply()
 
-import os
-import csv
-import time
-import dateparser
-import sqlite3
 import logging
 import discord
+from os import getenv
+from re import sub, UNICODE
+from csv import writer
+from time import time
 from uuid import uuid4
+from dotenv import load_dotenv
+from sqlite3 import connect, IntegrityError
+from dateparser import parse as d_parse
 from discord import guild_only
 from discord.ext import commands
 from discord.commands import option
-from dotenv import load_dotenv
+
 
 logger = logging.getLogger('discord')
 logger.setLevel(logging.DEBUG)
@@ -34,7 +40,7 @@ logger.addHandler(handler)
 
 load_dotenv()
 
-token = os.getenv("TOKEN")
+token = getenv("TOKEN")
 guildIDS = [1009793614337024000]
 modRoleIDS = [760402578218418201, 760402578218418202, 783625463334567966, 964096541906317392, 1015684635524608040] # Mod, Admin, Head admin, Shogun; Test role in testing server
 
@@ -43,7 +49,7 @@ intents.message_content = True
 
 # bot = commands.Bot(command_prefix='!', intents=intents)
 bot = discord.Bot(intents=intents)
-conn = sqlite3.connect('db/storage.db')
+conn = connect('db/storage.db')
 
 
 class ShowCodeButtonView(discord.ui.View): # Create a class called ShowCodeButtonView that subclasses discord.ui.View
@@ -65,8 +71,6 @@ class ShowCodeButtonView(discord.ui.View): # Create a class called ShowCodeButto
         if not(self.disabled):
             self.clear_items()
         return
-
-        # await self.message.edit(view=self) # content="Time limit reached, joining match disabled",
 
     @discord.ui.button(label="Show code", style=discord.ButtonStyle.primary) # Create a button with a label with color Blurple
     async def button_callback(self, button, interaction):
@@ -112,6 +116,7 @@ async def on_application_command_error(ctx: discord.ApplicationContext, error: d
 
 @bot.slash_command(guild_ids=guildIDS, description="Create a lobby for other players to join")
 # @commands.has_role(*modRoleIDS)
+@guild_only()
 @option(
         "code",
         description="6 letter match code",
@@ -139,20 +144,22 @@ async def lobby(ctx: discord.ApplicationContext, code: str, description: str):
     the other is used to close the match by the person who hosted.
 
     """
-    if(len(code) != 6 or not code.isalpha()):
-        await ctx.respond(content=f"Invalid lobby code: {code}", ephemeral=True)
+    sub_code = sub(r"[\W]+", "", code, flags=UNICODE) # Remove any non letters
+
+    if(len(sub_code) != 6 or not sub_code.isalpha()): # Checks code length and if it's only letters (redundant)
+        await ctx.respond(content=f"Invalid lobby code: {sub_code}", ephemeral=True)
         return
 
-    message_unix_time = int(time.time())
+    message_unix_time = int(time())
     unique_id = uuid4()
     embed = discord.Embed(
         title=description,
         description=f"**Host:** <@{ctx.user.id}>\n**ID:** `{unique_id}`",
         color=discord.Colour.blurple(), # Pycord provides a class with default colors you can choose from
     )
-    db_primary_key = lobby_creation_db(code.upper(), ctx.user.id, message_unix_time, unique_id)
+    db_primary_key = lobby_creation_db(sub_code.upper(), ctx.user.id, message_unix_time, unique_id)
     await ctx.delete()
-    await ctx.respond(view=ShowCodeButtonView(code=code, db_primary_key=db_primary_key, host=ctx.user.id), embed=embed)
+    await ctx.respond(view=ShowCodeButtonView(code=sub_code, db_primary_key=db_primary_key, host=ctx.user.id), embed=embed)
 
 
 # Moderation commands
@@ -309,7 +316,7 @@ def show_code_db(primary_key, player):
     with conn:
         try:
             cur.execute(f"INSERT INTO PARTICIPANTS (ID, PLAYER) VALUES({primary_key}, '{player}')")
-        except sqlite3.IntegrityError as sql_IE:
+        except IntegrityError as sql_IE:
             pass
 
     cur.close()
@@ -321,7 +328,7 @@ In order for discord to preview it, it gets saved as .txt.
 """
 def format_output(sql_data):
     with open("files/lobby_data.txt", "w", newline="") as tsv_file:
-        tsv_writer = csv.writer(tsv_file, delimiter='\t')
+        tsv_writer = writer(tsv_file, delimiter='\t')
         tsv_writer.writerow(("Unix", "Code", "Host", "Participants"))
         tsv_writer.writerows(to_tsv(sql_data))
 
@@ -393,9 +400,9 @@ def get_unix_single(argument):
     else:
         datestr = argument
 
-    dt = dateparser.parse(datestr, settings={'DATE_ORDER': 'MDY'})
+    dt = d_parse(datestr, settings={'DATE_ORDER': 'MDY'})
     unix_start = int(dt.timestamp())
-    unix_end = int(time.time())
+    unix_end = int(time())
     return get_period_db(unix_start, unix_end)
 
 
@@ -403,8 +410,8 @@ def get_unix_single(argument):
 Handles double date selection
 """
 def get_unix_double(arg1, arg2):
-    dt1 = dateparser.parse(arg1, settings={'DATE_ORDER': 'MDY'})
-    dt2 = dateparser.parse(arg2, settings={'DATE_ORDER': 'MDY'})
+    dt1 = d_parse(arg1, settings={'DATE_ORDER': 'MDY'})
+    dt2 = d_parse(arg2, settings={'DATE_ORDER': 'MDY'})
 
     unix_start = int(dt1.timestamp())
     unix_end = int(dt2.timestamp())
@@ -419,6 +426,6 @@ def get_period_db(unix_start, unix_end):
     data = cur.execute(f"select l.date, l.code, l.host, group_concat(p.player, '\t') from lobby l left join participants p on l.id = p.id where l.date > {unix_start} and l.date < {unix_end} group by l.code")
     format_output(data)
     cur.close()
-    
+
 
 bot.run(token)

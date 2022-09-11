@@ -9,9 +9,8 @@ Restrict access in server settings
 List of things to do in order
 TODO: Feedback
 TODO: Error handling
-    TODO: ApplicationCommandInvokeError to be per command instead of global
-    TODO: Exception ignored in: <function _ProactorBasePipeTransport.__del__ at 0x00000200BFFD31F0>
-
+    TODO: Exception ignored in: <function _ProactorBasePipeTransport.__del__ at 0x00000200BFFD31F0> --> nest_asyncio issue
+TODO: Memory stress test? mprof run bot.py --> mprof plot
 """
 
 import nest_asyncio
@@ -19,13 +18,13 @@ nest_asyncio.apply()
 
 import logging
 import discord
-from os import getenv
+from os import getenv, sep
 from re import sub, UNICODE
 from csv import writer
 from time import time
 from uuid import uuid4
 from dotenv import load_dotenv
-from sqlite3 import connect, IntegrityError
+from sqlite3 import connect, IntegrityError, OperationalError
 from dateparser import parse as d_parse
 from discord import guild_only
 from discord.ext import commands
@@ -49,9 +48,10 @@ intents.message_content = True
 
 # bot = commands.Bot(command_prefix='!', intents=intents)
 bot = discord.Bot(intents=intents)
-conn = connect('db/storage.db')
+conn = connect(f'db{sep}storage.db')
 
 
+# Button class
 class ShowCodeButtonView(discord.ui.View): # Create a class called ShowCodeButtonView that subclasses discord.ui.View
     """
     Class that subclasses discord.ui.View
@@ -68,9 +68,8 @@ class ShowCodeButtonView(discord.ui.View): # Create a class called ShowCodeButto
         self.disabled = False
 
     async def on_timeout(self):
-        if not(self.disabled):
-            self.clear_items()
-        return
+        self.clear_items()
+        await self.message.edit(content="Match closed", view=self)
 
     @discord.ui.button(label="Show code", style=discord.ButtonStyle.primary) # Create a button with a label with color Blurple
     async def button_callback(self, button, interaction):
@@ -87,33 +86,43 @@ class ShowCodeButtonView(discord.ui.View): # Create a class called ShowCodeButto
             await interaction.response.send_message(content="You're not the host of this match and therefore don't have permission to close it", ephemeral=True) # Send a message when the button is clicked
 
 
-# Bot events
+# Exception handling
+# Custom class to easily display message
+class ExceptionDisplayMessage(Exception):
+    pass
 
-@bot.event
-async def on_ready():
-    print(f"Logged in as {bot.user}")
 
-
+# Global
 @bot.event
 async def on_command_error(ctx: discord.ApplicationContext, error: discord.DiscordException):
     if isinstance(error, commands.MissingAnyRole):
         await ctx.respond("You don't have access to this command", ephemeral=True)
     else:
-        raise error
-
+        await ctx.respond(error)
 
 @bot.event
 async def on_application_command_error(ctx: discord.ApplicationContext, error: discord.DiscordException):
     if isinstance(error, commands.MissingAnyRole):
         await ctx.respond("You don't have access to this command", ephemeral=True)
     elif isinstance(error, discord.errors.ApplicationCommandInvokeError):
-        await ctx.respond("Error running command", ephemeral=True)
+        if isinstance(error.original, ExceptionDisplayMessage):
+            await ctx.respond(error.original, ephemeral=True)
+        elif isinstance(error.original, discord.errors.HTTPException): # exceeding max length of title (256)
+            if(error.original.code == 50035):
+                await ctx.respond("Make your description shorter", ephemeral=True)
+            else:
+                await ctx.respond(error.original)
+        else:
+            await ctx.respond(error)
     else:
-        raise error
+        await ctx.respond(error)
+
+@bot.event
+async def on_ready():
+    print(f"Logged in as {bot.user}")
 
 
 # User command
-
 @bot.slash_command(guild_ids=guildIDS, description="Create a lobby for other players to join")
 # @commands.has_role(*modRoleIDS)
 @guild_only()
@@ -158,8 +167,9 @@ async def lobby(ctx: discord.ApplicationContext, code: str, description: str):
         color=discord.Colour.blurple(), # Pycord provides a class with default colors you can choose from
     )
     db_primary_key = lobby_creation_db(sub_code.upper(), ctx.user.id, message_unix_time, unique_id)
+    button_view = ShowCodeButtonView(code=sub_code, db_primary_key=db_primary_key, host=ctx.user.id)
     await ctx.delete()
-    await ctx.respond(view=ShowCodeButtonView(code=sub_code, db_primary_key=db_primary_key, host=ctx.user.id), embed=embed)
+    button_view.message = await ctx.respond(view=button_view, embed=embed)
 
 
 # Moderation commands
@@ -194,11 +204,14 @@ async def getlobby(ctx: discord.ApplicationContext, code: str):
     elif(len(code) == 36):
         match_data = get_uuid_code_db(code)
     else:
-        await ctx.respond("None")
+        await ctx.respond("Please enter a valid code", ephemeral=True)
         return
 
     lobby, host, date, *participants = match_data
-    part_list = set(f"<@{player}>" for player in participants[0].split(", "))
+    try:
+        part_list = set(f"<@{player}>" for player in participants[0].split(", "))
+    except AttributeError:
+        raise ExceptionDisplayMessage(f"Invalid search: {code}")
 
     embed = discord.Embed(
         title=f"Code: {lobby}",
@@ -236,13 +249,16 @@ async def getlobbys(ctx: discord.ApplicationContext, codes: str):
     t_codes = tuple(codes.split(" "))
     sum_l = sum(map(lambda c: len(c), codes.split(" ")))
 
-    if(sum_l / len(t_codes) == 6):
-        get_lobby_codes_db(t_codes)
-    elif(sum_l / len(t_codes) == 36):
-        get_uuid_codes_db(t_codes)
-    else:
-        await ctx.respond("Invalid search")
-        return
+    try:
+        if(sum_l / len(t_codes) == 6):
+            get_lobby_codes_db(t_codes)
+        elif(sum_l / len(t_codes) == 36):
+            get_uuid_codes_db(t_codes)
+        else:
+            await ctx.respond("Please enter valid codes", ephemeral=True)
+            return
+    except OperationalError:
+        raise ExceptionDisplayMessage("Select more than 1 code please")
 
     response = discord.File("files/lobby_data.txt")
     await ctx.respond(file=response)
@@ -278,10 +294,13 @@ async def getperiod(ctx: discord.ApplicationContext, a1: str, a2: str=None):
     Data from the matches as a .tsv file.
 
     """
-    if(a2):
-        get_unix_double(a1, a2)
-    else:
-        get_unix_single(a1)
+    try:
+        if(a2):
+            get_unix_double(a1, a2)
+        else:
+            get_unix_single(a1)
+    except AttributeError:
+        raise ExceptionDisplayMessage("Invalid date selected")
 
     response = discord.File("files/lobby_data.txt")
     await ctx.respond(file=response)
@@ -327,7 +346,7 @@ Formats the output data to tsv to be opened in excel.
 In order for discord to preview it, it gets saved as .txt.
 """
 def format_output(sql_data):
-    with open("files/lobby_data.txt", "w", newline="") as tsv_file:
+    with open(f"files{sep}lobby_data.txt", "w", newline="") as tsv_file:
         tsv_writer = writer(tsv_file, delimiter='\t')
         tsv_writer.writerow(("Unix", "Code", "Host", "Participants"))
         tsv_writer.writerows(to_tsv(sql_data))

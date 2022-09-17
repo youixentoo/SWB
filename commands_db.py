@@ -42,10 +42,26 @@ def main():
     print("Opened database successfully");
     
     # show_code_command(cur, conn)
-    select_command(conn, cur)
+    # select_command(conn, cur)
+    mess = count_command(conn, cur)
+    print(mess)
     
     cur.close()
     conn.close()
+    
+    
+def count_command(conn, cur):
+    data = cur.execute("select count(id) from lobby")
+    rows,*_ = data.fetchone()
+    groups = cur.execute("select player from participants")
+    players = len(set(unpack_tuple(groups)))
+    return f"Total lobbies made: {rows}\nTotal unique players: {players}"
+    
+    
+def unpack_tuple(single_tuple):
+    for x in single_tuple:
+        p,*_ = x
+        yield p
     
 def select_command(conn, cur):
     # "select l.code, group_concat(p.player, ', ') from lobby l left join participants p on l.id = p.id and l.code = 'DGEHDS' group by l.id"

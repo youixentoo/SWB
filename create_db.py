@@ -39,8 +39,9 @@ cur.execute('''CREATE TABLE LOBBY
 cur.execute('''CREATE TABLE PARTICIPANTS
              (ID INTEGER,
               PLAYER TEXT NOT NULL,
-              FOREIGN KEY(ID) REFERENCES LOBBY(ID),
-              UNIQUE(ID, PLAYER));''')
+              FOREIGN KEY(ID) REFERENCES LOBBY(ID) ON DELETE CASCADE,
+              UNIQUE(ID, PLAYER)
+              );''')
          
 conn.commit()
          

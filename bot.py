@@ -114,6 +114,8 @@ async def on_application_command_error(ctx: discord.ApplicationContext, error: d
                 await ctx.respond(error.original)
         else:
             await ctx.respond(error)
+    elif isinstance(error, commands.errors.NotOwner):
+        await ctx.respond("You don't have access to this command", ephemeral=True)
     else:
         await ctx.respond(error)
 
@@ -306,6 +308,64 @@ async def getperiod(ctx: discord.ApplicationContext, a1: str, a2: str=None):
     await ctx.respond(file=response)
 
 
+# /stats
+@bot.slash_command(guild_ids=guildIDS, description="Get stats")
+@commands.has_any_role(*modRoleIDS)
+@guild_only()
+async def stats(ctx: discord.ApplicationContext):
+    """
+    Shows some stats
+
+    Returns
+    -------
+    Amount of lobbies and unique players logged.
+
+    """
+    stats = count_command()
+    embed = discord.Embed(
+        title=f"Logged stats",
+        description=f"Lobbies: {stats[0]}\nPlayers: {stats[1]}",
+        color=discord.Colour.blurple(), # Pycord provides a class with default colors you can choose from
+    )
+
+    await ctx.respond(embed=embed)
+
+# Owner command
+
+# /query
+@bot.slash_command(guild_ids=guildIDS, description="Query database")
+@commands.is_owner()
+@guild_only()
+async def query(ctx: discord.ApplicationContext, query: str):
+    """
+    Used to quey the database using the bot.
+    Owner only for obvious reasons.
+
+    Parameters
+    ----------
+    query : str
+        The query.
+
+    Returns
+    -------
+    Data.
+
+    """
+    if("drop table" in query.lower()):
+        await ctx.respond("No dropping tables here", ephemeral=True)
+
+    output = exc_query(query)
+
+    if output:
+        embed = discord.Embed(
+        description="{}".format("".join(make_lines(output))),
+        color=discord.Colour.blurple(), # Pycord provides a class with default colors you can choose from
+        )
+        await ctx.respond(embed=embed)
+    else:
+        await ctx.respond(f"Query: {query} executed")
+
+
 # From here on it's database related functions
 
 """
@@ -446,5 +506,47 @@ def get_period_db(unix_start, unix_end):
     format_output(data)
     cur.close()
 
+
+"""
+Count some data
+"""
+def count_command():
+    cur = conn.cursor()
+
+    data = cur.execute("select count(id) from lobby")
+    rows,*_ = data.fetchone()
+    groups = cur.execute("select player from participants")
+    players = len(set(unpack_tuple(groups)))
+
+    cur.close()
+    return (rows, players)
+
+
+"""
+Unpacks list of single value tuples
+"""
+def unpack_tuple(single_tuple):
+    for x in single_tuple:
+        p,*_ = x
+        yield p
+
+
+"""
+Query DB
+"""
+def exc_query(query):
+    cur = conn.cursor()
+    data = cur.execute(query)
+    output = data.fetchall()
+    cur.close()
+    return output
+
+
+"""
+Generate embed output query
+"""
+def make_lines(output):
+    for x in output:
+        yield f"{x}\n"
 
 bot.run(token)

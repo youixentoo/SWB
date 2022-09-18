@@ -40,7 +40,7 @@ logger.addHandler(handler)
 load_dotenv()
 
 token = getenv("TOKEN")
-guildIDS = [1009793614337024000]
+guildIDS = [1009793614337024000, 760402578147115038] # test server, sas world
 modRoleIDS = [760402578218418201, 760402578218418202, 783625463334567966, 964096541906317392, 1015684635524608040] # Mod, Admin, Head admin, Shogun; Test role in testing server
 
 intents = discord.Intents.default()
@@ -49,6 +49,7 @@ intents.message_content = True
 # bot = commands.Bot(command_prefix='!', intents=intents)
 bot = discord.Bot(intents=intents)
 conn = connect(f'db{sep}storage.db')
+conn.execute("pragma foreign_keys = 1")
 
 
 # Button class
@@ -107,9 +108,9 @@ async def on_application_command_error(ctx: discord.ApplicationContext, error: d
     elif isinstance(error, discord.errors.ApplicationCommandInvokeError):
         if isinstance(error.original, ExceptionDisplayMessage):
             await ctx.respond(error.original, ephemeral=True)
-        elif isinstance(error.original, discord.errors.HTTPException): # exceeding max length of title (256)
-            if(error.original.code == 50035):
-                await ctx.respond("Make your description shorter", ephemeral=True)
+        elif isinstance(error.original, discord.errors.HTTPException):
+            if(error.original.code == 50035): # exceeding max length of title (256)
+                await ctx.respond("Make your description shorter")
             else:
                 await ctx.respond(error.original)
         else:
@@ -338,7 +339,7 @@ async def stats(ctx: discord.ApplicationContext):
 @guild_only()
 async def query(ctx: discord.ApplicationContext, query: str):
     """
-    Used to quey the database using the bot.
+    Used to query the database using the bot.
     Owner only for obvious reasons.
 
     Parameters

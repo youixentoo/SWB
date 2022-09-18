@@ -117,8 +117,10 @@ async def on_application_command_error(ctx: discord.ApplicationContext, error: d
             await ctx.respond(error)
     elif isinstance(error, commands.errors.NotOwner):
         await ctx.respond("You don't have access to this command", ephemeral=True)
+    elif isinstance(error, commands.errors.CommandOnCooldown):
+        await ctx.respond(error, ephemeral=True)
     else:
-        await ctx.respond(error)
+        await ctx.respond(type(error))
 
 @bot.event
 async def on_ready():
@@ -127,6 +129,7 @@ async def on_ready():
 
 # User command
 @bot.slash_command(guild_ids=guildIDS, description="Create a lobby for other players to join")
+@commands.cooldown(1, 10)
 # @commands.has_role(*modRoleIDS)
 @guild_only()
 @option(
@@ -142,6 +145,7 @@ async def on_ready():
 async def lobby(ctx: discord.ApplicationContext, code: str, description: str):
     """
     Command for creation of lobbies. Stores every lobby in a sqlite database.
+    Cooldown: rate: 1, per: 10 seconds.
 
     Parameters
     ----------
@@ -179,6 +183,7 @@ async def lobby(ctx: discord.ApplicationContext, code: str, description: str):
 
 # /getlobby
 @bot.slash_command(guild_ids=guildIDS, description="Retrieve data from a lobby using either the lobby code or the lobby id")
+@commands.cooldown(1, 5)
 @commands.has_any_role(*modRoleIDS)
 @guild_only()
 @option(
@@ -227,6 +232,7 @@ async def getlobby(ctx: discord.ApplicationContext, code: str):
 
 # /getlobbys
 @bot.slash_command(guild_ids=guildIDS, description="Retrieve data from multiple lobbies at once. Only ever search 1 type of code at once.")
+@commands.cooldown(1, 5)
 @commands.has_any_role(*modRoleIDS)
 @guild_only()
 @option(
@@ -269,6 +275,7 @@ async def getlobbys(ctx: discord.ApplicationContext, codes: str):
 
 # /getperiod
 @bot.slash_command(guild_ids=guildIDS, description="Retrieve lobbies from a specified time period. Retrieves from now until specified without a2. (DMY)")
+@commands.cooldown(1, 5)
 @commands.has_any_role(*modRoleIDS)
 @guild_only()
 @option(
@@ -311,6 +318,7 @@ async def getperiod(ctx: discord.ApplicationContext, a1: str, a2: str=None):
 
 # /stats
 @bot.slash_command(guild_ids=guildIDS, description="Get stats")
+@commands.cooldown(1, 5)
 @commands.has_any_role(*modRoleIDS)
 @guild_only()
 async def stats(ctx: discord.ApplicationContext):
@@ -335,6 +343,7 @@ async def stats(ctx: discord.ApplicationContext):
 
 # /query
 @bot.slash_command(guild_ids=guildIDS, description="Query database")
+@commands.cooldown(1, 5)
 @commands.is_owner()
 @guild_only()
 async def query(ctx: discord.ApplicationContext, query: str):

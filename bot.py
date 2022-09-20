@@ -37,10 +37,11 @@ handler = logging.FileHandler(filename='discord.log', encoding='utf-8', mode='w'
 handler.setFormatter(logging.Formatter('%(asctime)s:%(levelname)s:%(name)s: %(message)s'))
 logger.addHandler(handler)
 
-load_dotenv()
+load_dotenv(".env_beta")
 
 token = getenv("TOKEN")
 guildIDS = [1009793614337024000, 760402578147115038] # test server, sas world
+channelIDS = [1018908633846788188, 1009793614337024002, 1009793614337024003, 981847570366205962, 981849633699561562, 760402578718064731, 760402578290507832] # test, testing, general | sas4-fact, sas4-priv, 396-400, holy-knight
 modRoleIDS = [760402578218418201, 760402578218418202, 783625463334567966, 964096541906317392, 1015684635524608040] # Mod, Admin, Head admin, Shogun; Test role in testing server
 
 intents = discord.Intents.default()
@@ -67,6 +68,7 @@ class ShowCodeButtonView(discord.ui.View): # Create a class called ShowCodeButto
         self.db_primary_key = db_primary_key
         self.host = host
         self.disabled = False
+        self.cd = commands.CooldownMapping(commands.Cooldown(7, 4), commands.BucketType.member) # So for some reason this is still set to global.
 
     async def on_timeout(self):
         self.clear_items()
@@ -74,6 +76,11 @@ class ShowCodeButtonView(discord.ui.View): # Create a class called ShowCodeButto
 
     @discord.ui.button(label="Show code", style=discord.ButtonStyle.primary) # Create a button with a label with color Blurple
     async def button_callback(self, button, interaction):
+        bucket = self.cd.get_bucket(interaction.message)
+        retry_after = bucket.update_rate_limit()
+        if retry_after:
+            return await interaction.response.send_message(f"Too many requests. Try again in: {round(retry_after, 1)} seconds.", ephemeral=True)
+        
         show_code_db(self.db_primary_key, interaction.user.id)
         await interaction.response.send_message(content=self.code.upper(), ephemeral=True) # Send a message when the button is clicked
 
@@ -91,6 +98,15 @@ class ShowCodeButtonView(discord.ui.View): # Create a class called ShowCodeButto
 # Custom class to easily display message
 class ExceptionDisplayMessage(Exception):
     pass
+
+
+"""
+Check if the channel is correct
+"""       
+def correct_channel():
+    def predicate(ctx):
+        return ctx.channel_id in channelIDS
+    return commands.check(predicate)
 
 
 # Global
@@ -119,6 +135,8 @@ async def on_application_command_error(ctx: discord.ApplicationContext, error: d
         await ctx.respond("You don't have access to this command", ephemeral=True)
     elif isinstance(error, commands.errors.CommandOnCooldown):
         await ctx.respond(error, ephemeral=True)
+    elif isinstance(error, discord.errors.CheckFailure):
+        await ctx.respond("You can't use this command here", ephemeral=True)
     else:
         await ctx.respond(type(error))
 
@@ -132,6 +150,7 @@ async def on_ready():
 @commands.cooldown(1, 10)
 # @commands.has_role(*modRoleIDS)
 @guild_only()
+@correct_channel()
 @option(
         "code",
         description="6 letter match code",
@@ -186,6 +205,7 @@ async def lobby(ctx: discord.ApplicationContext, code: str, description: str):
 @commands.cooldown(1, 5)
 @commands.has_any_role(*modRoleIDS)
 @guild_only()
+@correct_channel()
 @option(
         "code",
         description="Lobby code or lobby id",
@@ -235,6 +255,7 @@ async def getlobby(ctx: discord.ApplicationContext, code: str):
 @commands.cooldown(1, 5)
 @commands.has_any_role(*modRoleIDS)
 @guild_only()
+@correct_channel()
 @option(
         "codes",
         description="Multiple lobby codes or lobby ids, seperated with a space",
@@ -278,6 +299,7 @@ async def getlobbys(ctx: discord.ApplicationContext, codes: str):
 @commands.cooldown(1, 5)
 @commands.has_any_role(*modRoleIDS)
 @guild_only()
+@correct_channel()
 @option(
         "a1",
         description="First date, also supports for example: 20m, 3h, or 5d",
@@ -321,6 +343,7 @@ async def getperiod(ctx: discord.ApplicationContext, a1: str, a2: str=None):
 @commands.cooldown(1, 5)
 @commands.has_any_role(*modRoleIDS)
 @guild_only()
+@correct_channel()
 async def stats(ctx: discord.ApplicationContext):
     """
     Shows some stats
@@ -346,6 +369,7 @@ async def stats(ctx: discord.ApplicationContext):
 @commands.cooldown(1, 5)
 @commands.is_owner()
 @guild_only()
+@correct_channel()
 async def query(ctx: discord.ApplicationContext, query: str):
     """
     Used to query the database using the bot.
@@ -374,7 +398,7 @@ async def query(ctx: discord.ApplicationContext, query: str):
         await ctx.respond(embed=embed)
     else:
         await ctx.respond(f"Query: {query} executed")
-
+    
 
 # From here on it's database related functions
 

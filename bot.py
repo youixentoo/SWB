@@ -37,7 +37,7 @@ handler = logging.FileHandler(filename='discord.log', encoding='utf-8', mode='w'
 handler.setFormatter(logging.Formatter('%(asctime)s:%(levelname)s:%(name)s: %(message)s'))
 logger.addHandler(handler)
 
-load_dotenv()
+load_dotenv(".env_beta")
 
 token = getenv("TOKEN")
 guildIDS = [1009793614337024000, 760402578147115038] # test server, sas world
@@ -67,6 +67,7 @@ class ShowCodeButtonView(discord.ui.View): # Create a class called ShowCodeButto
         self.db_primary_key = db_primary_key
         self.host = host
         self.disabled = False
+        self.cd = commands.CooldownMapping(commands.Cooldown(7, 4), commands.BucketType.member) # So for some reason this is still set to global.
 
     async def on_timeout(self):
         self.clear_items()
@@ -74,6 +75,11 @@ class ShowCodeButtonView(discord.ui.View): # Create a class called ShowCodeButto
 
     @discord.ui.button(label="Show code", style=discord.ButtonStyle.primary) # Create a button with a label with color Blurple
     async def button_callback(self, button, interaction):
+        bucket = self.cd.get_bucket(interaction.message)
+        retry_after = bucket.update_rate_limit()
+        if retry_after:
+            return await interaction.response.send_message(f"Too many requests. Try again in: {round(retry_after, 1)} seconds.", ephemeral=True)
+        
         show_code_db(self.db_primary_key, interaction.user.id)
         await interaction.response.send_message(content=self.code.upper(), ephemeral=True) # Send a message when the button is clicked
 

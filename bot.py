@@ -34,7 +34,7 @@ handler = logging.FileHandler(filename='discord.log', encoding='utf-8', mode='w'
 handler.setFormatter(logging.Formatter(fmt='[%(asctime)s]:%(levelname)s:%(name)s: %(message)s', datefmt="%Y-%m-%d %H:%M:%S"))
 logger.addHandler(handler)
 
-load_dotenv(".env")
+load_dotenv()
 
 token = getenv("TOKEN")
 guildIDS = [1009793614337024000, 760402578147115038] # test server, sas world

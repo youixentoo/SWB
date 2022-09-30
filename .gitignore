@@ -1,6 +1,6 @@
 # Env variables
 .env
-.env_beta
+.env_live
 
 # Other
 *.json

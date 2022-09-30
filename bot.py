@@ -6,11 +6,8 @@ Created on Sun Aug 14 11:02:45 2022
 
 Restrict access in server settings
 
-List of things to do in order
-TODO: Feedback
-TODO: Error handling
-    TODO: Exception ignored in: <function _ProactorBasePipeTransport.__del__ at 0x00000200BFFD31F0> --> nest_asyncio issue
-TODO: Memory stress test? mprof run bot.py --> mprof plot
+TODO: Fix rate limits to be per person
+    
 """
 
 import nest_asyncio
@@ -32,9 +29,9 @@ from discord.commands import option
 
 
 logger = logging.getLogger('discord')
-logger.setLevel(logging.DEBUG)
+logger.setLevel(logging.INFO)
 handler = logging.FileHandler(filename='discord.log', encoding='utf-8', mode='w')
-handler.setFormatter(logging.Formatter('%(asctime)s:%(levelname)s:%(name)s: %(message)s'))
+handler.setFormatter(logging.Formatter(fmt='[%(asctime)s]:%(levelname)s:%(name)s: %(message)s', datefmt="%Y-%m-%d %H:%M:%S"))
 logger.addHandler(handler)
 
 load_dotenv()
@@ -80,7 +77,7 @@ class ShowCodeButtonView(discord.ui.View): # Create a class called ShowCodeButto
         retry_after = bucket.update_rate_limit()
         if retry_after:
             return await interaction.response.send_message(f"Too many requests. Try again in: {round(retry_after, 1)} seconds.", ephemeral=True)
-        
+
         show_code_db(self.db_primary_key, interaction.user.id)
         await interaction.response.send_message(content=self.code.upper(), ephemeral=True) # Send a message when the button is clicked
 
@@ -102,7 +99,7 @@ class ExceptionDisplayMessage(Exception):
 
 """
 Check if the channel is correct
-"""       
+"""
 def correct_channel():
     def predicate(ctx):
         return ctx.channel_id in channelIDS
@@ -138,11 +135,15 @@ async def on_application_command_error(ctx: discord.ApplicationContext, error: d
     elif isinstance(error, discord.errors.CheckFailure):
         await ctx.respond("You can't use this command here", ephemeral=True)
     else:
-        await ctx.respond(type(error))
+        await ctx.respond(f"Something's gone horribly wrong: {type(error)}")
 
 @bot.event
 async def on_ready():
     print(f"Logged in as {bot.user}")
+
+@bot.event
+async def on_application_command(ctx: discord.ApplicationContext):
+    logger.info(f"User: {ctx.user} ({ctx.user.id}) used command: /{ctx.command}")
 
 
 # User command
@@ -398,7 +399,7 @@ async def query(ctx: discord.ApplicationContext, query: str):
         await ctx.respond(embed=embed)
     else:
         await ctx.respond(f"Query: {query} executed")
-    
+
 
 # From here on it's database related functions
 

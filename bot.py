@@ -7,7 +7,7 @@ Created on Sun Aug 14 11:02:45 2022
 Restrict access in server settings
 
 TODO: Fix rate limits to be per person
-    
+
 """
 
 import nest_asyncio
@@ -30,7 +30,7 @@ from discord.commands import option
 
 logger = logging.getLogger('discord')
 logger.setLevel(logging.INFO)
-handler = logging.FileHandler(filename='discord.log', encoding='utf-8', mode='w')
+handler = logging.FileHandler(filename='discord.log', encoding='utf-8', mode='a+')
 handler.setFormatter(logging.Formatter(fmt='[%(asctime)s]:%(levelname)s:%(name)s: %(message)s', datefmt="%Y-%m-%d %H:%M:%S"))
 logger.addHandler(handler)
 

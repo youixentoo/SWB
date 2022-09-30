@@ -73,6 +73,7 @@ class ShowCodeButtonView(discord.ui.View): # Create a class called ShowCodeButto
 
     @discord.ui.button(label="Show code", style=discord.ButtonStyle.primary) # Create a button with a label with color Blurple
     async def button_callback(self, button, interaction):
+        logger.info(f"User: {interaction.user} ({interaction.user.id}) pressed the 'Show Code' button")
         bucket = self.cd.get_bucket(interaction.message)
         retry_after = bucket.update_rate_limit()
         if retry_after:

@@ -117,6 +117,7 @@ async def on_command_error(ctx: discord.ApplicationContext, error: discord.Disco
 
 @bot.event
 async def on_application_command_error(ctx: discord.ApplicationContext, error: discord.DiscordException):
+    logger.warning(f"User: {ctx.user} ({ctx.user.id}) used command: /{ctx.command} and caused:\n{error}")
     if isinstance(error, commands.MissingAnyRole):
         await ctx.respond("You don't have access to this command", ephemeral=True)
     elif isinstance(error, discord.errors.ApplicationCommandInvokeError):
@@ -149,7 +150,7 @@ async def on_application_command(ctx: discord.ApplicationContext):
 
 # User command
 @bot.slash_command(guild_ids=guildIDS, description="Create a lobby for other players to join")
-@commands.cooldown(1, 10)
+@commands.cooldown(1, 5)
 # @commands.has_role(*modRoleIDS)
 @guild_only()
 @correct_channel()

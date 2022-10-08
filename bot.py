@@ -208,7 +208,7 @@ async def lobby(ctx: discord.ApplicationContext, code: str, description: str):
 @commands.cooldown(1, 5)
 @commands.has_any_role(*modRoleIDS)
 @guild_only()
-@correct_channel()
+# @correct_channel()
 @option(
         "code",
         description="Lobby code or lobby id",
@@ -258,7 +258,7 @@ async def getlobby(ctx: discord.ApplicationContext, code: str):
 @commands.cooldown(1, 5)
 @commands.has_any_role(*modRoleIDS)
 @guild_only()
-@correct_channel()
+# @correct_channel()
 @option(
         "codes",
         description="Multiple lobby codes or lobby ids, seperated with a space",
@@ -302,7 +302,7 @@ async def getlobbys(ctx: discord.ApplicationContext, codes: str):
 @commands.cooldown(1, 5)
 @commands.has_any_role(*modRoleIDS)
 @guild_only()
-@correct_channel()
+# @correct_channel()
 @option(
         "a1",
         description="First date, also supports for example: 20m, 3h, or 5d",
@@ -346,7 +346,7 @@ async def getperiod(ctx: discord.ApplicationContext, a1: str, a2: str=None):
 @commands.cooldown(1, 5)
 @commands.has_any_role(*modRoleIDS)
 @guild_only()
-@correct_channel()
+# @correct_channel()
 async def stats(ctx: discord.ApplicationContext):
     """
     Shows some stats
@@ -372,7 +372,7 @@ async def stats(ctx: discord.ApplicationContext):
 @commands.cooldown(1, 5)
 @commands.is_owner()
 @guild_only()
-@correct_channel()
+# @correct_channel()
 async def query(ctx: discord.ApplicationContext, query: str):
     """
     Used to query the database using the bot.

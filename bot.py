@@ -59,11 +59,12 @@ class ShowCodeButtonView(discord.ui.View): # Create a class called ShowCodeButto
     The other button closes the match (removes all buttons), only the person who hosts can do this.
     The match gets closed automatically after 300 seconds (5 min)
     """
-    def __init__(self, *, code, db_primary_key, host, **kwargs):
+    def __init__(self, *, code, db_primary_key, host, hackers, **kwargs):
         super().__init__(**kwargs, timeout=300) # I think it's in seconds
         self.code = code
         self.db_primary_key = db_primary_key
         self.host = host
+        self.hackers = hackers
         self.disabled = False
         self.cd = commands.CooldownMapping(commands.Cooldown(7, 4), commands.BucketType.member) # So for some reason this is still set to global.
 
@@ -79,8 +80,11 @@ class ShowCodeButtonView(discord.ui.View): # Create a class called ShowCodeButto
         if retry_after:
             return await interaction.response.send_message(f"Too many requests. Try again in: {round(retry_after, 1)} seconds.", ephemeral=True)
 
-        show_code_db(self.db_primary_key, interaction.user.id)
-        await interaction.response.send_message(content=self.code.upper(), ephemeral=True) # Send a message when the button is clicked
+        if interaction.user.get_role(760402578202165282): # Check if the person has hacker role # 'other' role in test server: 1027299501356093562
+            await interaction.response.send_message(content="The host of this match has prevented hackers from joining", ephemeral=True) # Send a message when the button is clicked
+        else:
+            show_code_db(self.db_primary_key, interaction.user.id)
+            await interaction.response.send_message(content=self.code.upper(), ephemeral=True) # Send a message when the button is clicked
 
     @discord.ui.button(label="Close", style=discord.ButtonStyle.red) # Create a button with a label with color Red
     async def second_button_callback(self, button, interaction):
@@ -164,7 +168,12 @@ async def on_application_command(ctx: discord.ApplicationContext):
         description="Type of match, for example: 'NM pods'",
         required=True
         )
-async def lobby(ctx: discord.ApplicationContext, code: str, description: str):
+@option(
+        "hackers",
+        description="Allow hackers to join?",
+        required=False,
+        default=True)
+async def lobby(ctx: discord.ApplicationContext, code: str, description: str, hackers: bool):
     """
     Command for creation of lobbies. Stores every lobby in a sqlite database.
     Cooldown: rate: 1, per: 10 seconds.
@@ -175,6 +184,8 @@ async def lobby(ctx: discord.ApplicationContext, code: str, description: str):
         The lobby code.
     description : str
         Description of the match; game mode, map, etc.
+    hackers: bool, optional
+        Do you allow people with hacker role to get the code?
 
     Returns
     -------
@@ -196,7 +207,7 @@ async def lobby(ctx: discord.ApplicationContext, code: str, description: str):
         color=discord.Colour.blurple(), # Pycord provides a class with default colors you can choose from
     )
     db_primary_key = lobby_creation_db(sub_code.upper(), ctx.user.id, message_unix_time, unique_id)
-    button_view = ShowCodeButtonView(code=sub_code, db_primary_key=db_primary_key, host=ctx.user.id)
+    button_view = ShowCodeButtonView(code=sub_code, db_primary_key=db_primary_key, host=ctx.user.id, hackers=hackers)
     await ctx.delete()
     button_view.message = await ctx.respond(view=button_view, embed=embed)
 

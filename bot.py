@@ -375,6 +375,30 @@ async def stats(ctx: discord.ApplicationContext):
     )
 
     await ctx.respond(embed=embed)
+    
+    
+# /usethebot
+@bot.slash_command(guild_ids=guildIDS, description="Use the bot")
+@commands.cooldown(1, 5)
+@commands.has_any_role(*modRoleIDS)
+@guild_only()
+# @correct_channel()
+async def usethebot(ctx: discord.ApplicationContext):
+    """
+    Shows embed to use the bot
+
+    Returns
+    -------
+    Embed telling you to use the bot
+
+    """
+    embed = discord.Embed(
+        title=f"This bot exists in case you find hackers in your lobby",
+        description=f"Use **/lobby**\nFor more info: https://discord.com/channels/760402578147115038/761205837880098816/1025861519713509376",
+        color=discord.Colour.blurple(), # Pycord provides a class with default colors you can choose from
+    )
+
+    await ctx.respond(embed=embed)
 
 # Owner command
 

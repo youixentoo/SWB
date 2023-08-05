@@ -3,7 +3,7 @@
 .env_live
 
 # Other
-*.json
+storage.json
 db/
 files/
 *.dat

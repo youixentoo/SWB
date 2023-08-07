@@ -1,6 +1,7 @@
 # Env variables
 .env
 .env_live
+.env_beta
 
 # Other
 storage.json

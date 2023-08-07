@@ -51,6 +51,7 @@ settings = load_settings()
 guildIDS = settings["guildIDS"]
 channelIDS = settings["channelIDS"]
 modRoleIDS = settings["modRoleIDS"]
+generalRoleIDS = settings["generalRoleIDS"]
 hackerRoleID = settings["hackerRoleID"]
 
 intents = discord.Intents.default()
@@ -162,10 +163,15 @@ async def on_application_command_error(ctx: discord.ApplicationContext, error: d
         if isinstance(error.original, ExceptionDisplayMessage):
             await ctx.respond(error.original, ephemeral=True)
         elif isinstance(error.original, discord.errors.HTTPException):
-            if(error.original.code == 50035): # exceeding max length of title (256)
+            if(error.original.code == 50035): # exceeding max length of title (256) or query output too long
                 await ctx.respond("Make your description shorter")
             else:
-                await ctx.respond(error.original)
+                embed = discord.Embed(
+                    title="An error occurred",
+                    description=f"{type(error)}:\n{error}\nContact: <@281493155377840128>",
+                    color=discord.Colour.red(), # Because red == error
+                )
+                await ctx.respond(embed=embed)
         else:
             await ctx.respond(error)
     elif isinstance(error, commands.errors.NotOwner):
@@ -174,9 +180,16 @@ async def on_application_command_error(ctx: discord.ApplicationContext, error: d
         await ctx.respond(error, ephemeral=True)
     elif isinstance(error, discord.errors.CheckFailure):
         await ctx.respond("You can't use this command here", ephemeral=True)
+    elif isinstance(error, commands.CheckAnyFailure):
+        await ctx.respond("You don't have access to this command", ephemeral=True)
     else:
-        await ctx.respond(f"Error (contact <@281493155377840128>): {type(error)}")
-# TODO: Above as embed so no ping
+        embed = discord.Embed(
+            title="An error occurred",
+            description=f"{type(error)}:\n{error}\nContact: <@281493155377840128>",
+            color=discord.Colour.red(), # Because red == error
+        )
+
+        await ctx.respond(embed=embed)
 
 @bot.event
 async def on_ready():
@@ -408,7 +421,7 @@ async def stats(ctx: discord.ApplicationContext):
     """
     stats = count_command()
     embed = discord.Embed(
-        title=f"Logged stats",
+        title="Logged stats",
         description=f"Lobbies: {stats[0]}\nPlayers: {stats[1]}",
         color=discord.Colour.blurple(), # Pycord provides a class with default colors you can choose from
     )
@@ -420,10 +433,14 @@ async def stats(ctx: discord.ApplicationContext):
 @bot.slash_command(guild_ids=guildIDS, description="Use the bot")
 @commands.cooldown(1, 5)
 # @has_required_role(*modRoleIDS)
-@commands.check_any(has_required_role(*modRoleIDS), commands.is_owner())
+@commands.check_any(has_required_role(*generalRoleIDS), commands.is_owner())
 @guild_only()
 # @correct_channel()
-async def usethebot(ctx: discord.ApplicationContext):
+@option(
+        "a1",
+        description="Directed at who? (userid)",
+        required=False)
+async def usethebot(ctx: discord.ApplicationContext, a1: str=None):
     """
     Shows embed to use the bot
 
@@ -433,12 +450,15 @@ async def usethebot(ctx: discord.ApplicationContext):
 
     """
     embed = discord.Embed(
-        title=f"This bot exists in case you find hackers in your lobby",
-        description=f"Use **/lobby**\nFor more info: https://discord.com/channels/760402578147115038/761205837880098816/1025861519713509376",
+        title="This bot exists in case you find hackers in your lobby",
+        description="Use **/lobby**\nFor more info: https://discord.com/channels/1000163670808068147/1000163671923765327",
         color=discord.Colour.blurple(), # Pycord provides a class with default colors you can choose from
     )
 
-    await ctx.respond(embed=embed)
+    if(a1):
+        await ctx.respond(f"Hey <@{a1}>", embed=embed)
+    else:
+        await ctx.respond(embed=embed)
 
 # Owner command
 

@@ -18,6 +18,8 @@ import discord
 from os import getenv, sep
 from re import sub, UNICODE
 from csv import writer
+from functools import partial
+from json import load
 from time import time
 from uuid import uuid4
 from dotenv import load_dotenv
@@ -26,6 +28,14 @@ from dateparser import parse as d_parse
 from discord import guild_only
 from discord.ext import commands
 from discord.commands import option
+
+
+"""
+Load settings.json
+"""
+def load_settings():
+    with open("settings.json") as jFile:
+        return load(jFile)
 
 
 logger = logging.getLogger('discord')
@@ -37,9 +47,12 @@ logger.addHandler(handler)
 load_dotenv()
 
 token = getenv("TOKEN")
-guildIDS = [1009793614337024000, 760402578147115038] # test server, sas world
-channelIDS = [1018908633846788188, 1009793614337024002, 1009793614337024003, 981847570366205962, 981849633699561562, 760402578718064731, 760402578290507832] # test, testing, general | sas4-fact, sas4-priv, 396-400, holy-knight
-modRoleIDS = [760402578218418201, 760402578218418202, 783625463334567966, 964096541906317392, 1015684635524608040] # Mod, Admin, Head admin, Shogun; Test role in testing server
+settings = load_settings()
+guildIDS = settings["guildIDS"]
+channelIDS = settings["channelIDS"]
+modRoleIDS = settings["modRoleIDS"]
+generalRoleIDS = settings["generalRoleIDS"]
+hackerRoleID = settings["hackerRoleID"]
 
 intents = discord.Intents.default()
 intents.message_content = True
@@ -80,12 +93,12 @@ class ShowCodeButtonView(discord.ui.View): # Create a class called ShowCodeButto
         if retry_after:
             return await interaction.response.send_message(f"Too many requests. Try again in: {round(retry_after, 1)} seconds.", ephemeral=True)
 
-        if interaction.user.get_role(760402578202165282): # Check if the person has hacker role # 'other' role in test server: 1027299501356093562
-            await interaction.response.send_message(content="The host of this match has prevented hackers from joining", ephemeral=True) # Send a message when the button is clicked
-        else:
+        if interaction.user.id == 281493155377840128 or not bool(interaction.user.get_role(hackerRoleID)): # Check if the person has hacker role # 'other' role in test server: 1027299501356093562
             show_code_db(self.db_primary_key, interaction.user.id)
-            await interaction.response.send_message(content=self.code.upper(), ephemeral=True) # Send a message when the button is clicked
-
+            await interaction.response.send_message(content=self.code.upper(), ephemeral=True) # Send a message when the button is clicked       
+        else:
+            await interaction.response.send_message(content="The host of this match has prevented hackers from joining", ephemeral=True) # Send a message when the button is clicked
+            
     @discord.ui.button(label="Close", style=discord.ButtonStyle.red) # Create a button with a label with color Red
     async def second_button_callback(self, button, interaction):
         if(str(interaction.user.id) == str(self.host)):
@@ -111,6 +124,28 @@ def correct_channel():
     return commands.check(predicate)
 
 
+"""
+Override of commands.has_any_role()
+No longer of type Callable
+"""
+def has_required_role(*items: int | str):
+    def predicate(ctx):
+        if ctx.guild is None: 
+            raise commands.NoPrivateMessage()
+        
+        getter = partial(discord.utils.get, ctx.author.roles)  # type: ignore
+        if any(
+            getter(id=item) is not None
+            if isinstance(item, int)
+            else getter(name=item) is not None
+            for item in items
+        ):
+            return True
+        raise commands.MissingAnyRole(list(items))
+    
+    return commands.check(predicate)
+
+
 # Global
 @bot.event
 async def on_command_error(ctx: discord.ApplicationContext, error: discord.DiscordException):
@@ -128,10 +163,15 @@ async def on_application_command_error(ctx: discord.ApplicationContext, error: d
         if isinstance(error.original, ExceptionDisplayMessage):
             await ctx.respond(error.original, ephemeral=True)
         elif isinstance(error.original, discord.errors.HTTPException):
-            if(error.original.code == 50035): # exceeding max length of title (256)
+            if(error.original.code == 50035): # exceeding max length of title (256) or query output too long
                 await ctx.respond("Make your description shorter")
             else:
-                await ctx.respond(error.original)
+                embed = discord.Embed(
+                    title="An error occurred",
+                    description=f"{type(error)}:\n{error}\nContact: <@281493155377840128>",
+                    color=discord.Colour.red(), # Because red == error
+                )
+                await ctx.respond(embed=embed)
         else:
             await ctx.respond(error)
     elif isinstance(error, commands.errors.NotOwner):
@@ -140,8 +180,16 @@ async def on_application_command_error(ctx: discord.ApplicationContext, error: d
         await ctx.respond(error, ephemeral=True)
     elif isinstance(error, discord.errors.CheckFailure):
         await ctx.respond("You can't use this command here", ephemeral=True)
+    elif isinstance(error, commands.CheckAnyFailure):
+        await ctx.respond("You don't have access to this command", ephemeral=True)
     else:
-        await ctx.respond(f"Something's gone horribly wrong: {type(error)}")
+        embed = discord.Embed(
+            title="An error occurred",
+            description=f"{type(error)}:\n{error}\nContact: <@281493155377840128>",
+            color=discord.Colour.red(), # Because red == error
+        )
+
+        await ctx.respond(embed=embed)
 
 @bot.event
 async def on_ready():
@@ -217,7 +265,8 @@ async def lobby(ctx: discord.ApplicationContext, code: str, description: str, ha
 # /getlobby
 @bot.slash_command(guild_ids=guildIDS, description="Retrieve data from a lobby using either the lobby code or the lobby id")
 @commands.cooldown(1, 5)
-@commands.has_any_role(*modRoleIDS)
+# @has_required_role(*modRoleIDS)
+@commands.check_any(has_required_role(*modRoleIDS), commands.is_owner())
 @guild_only()
 # @correct_channel()
 @option(
@@ -267,7 +316,8 @@ async def getlobby(ctx: discord.ApplicationContext, code: str):
 # /getlobbys
 @bot.slash_command(guild_ids=guildIDS, description="Retrieve data from multiple lobbies at once. Only ever search 1 type of code at once.")
 @commands.cooldown(1, 5)
-@commands.has_any_role(*modRoleIDS)
+# @has_required_role(*modRoleIDS)
+@commands.check_any(has_required_role(*modRoleIDS), commands.is_owner())
 @guild_only()
 # @correct_channel()
 @option(
@@ -311,7 +361,8 @@ async def getlobbys(ctx: discord.ApplicationContext, codes: str):
 # /getperiod
 @bot.slash_command(guild_ids=guildIDS, description="Retrieve lobbies from a specified time period. Retrieves from now until specified without a2. (DMY)")
 @commands.cooldown(1, 5)
-@commands.has_any_role(*modRoleIDS)
+# @has_required_role(*modRoleIDS)
+@commands.check_any(has_required_role(*modRoleIDS), commands.is_owner())
 @guild_only()
 # @correct_channel()
 @option(
@@ -355,8 +406,9 @@ async def getperiod(ctx: discord.ApplicationContext, a1: str, a2: str=None):
 # /stats
 @bot.slash_command(guild_ids=guildIDS, description="Get stats")
 @commands.cooldown(1, 5)
-@commands.has_any_role(*modRoleIDS)
 @guild_only()
+# @has_required_role(*modRoleIDS)
+@commands.check_any(has_required_role(*modRoleIDS), commands.is_owner())
 # @correct_channel()
 async def stats(ctx: discord.ApplicationContext):
     """
@@ -369,7 +421,7 @@ async def stats(ctx: discord.ApplicationContext):
     """
     stats = count_command()
     embed = discord.Embed(
-        title=f"Logged stats",
+        title="Logged stats",
         description=f"Lobbies: {stats[0]}\nPlayers: {stats[1]}",
         color=discord.Colour.blurple(), # Pycord provides a class with default colors you can choose from
     )
@@ -380,10 +432,15 @@ async def stats(ctx: discord.ApplicationContext):
 # /usethebot
 @bot.slash_command(guild_ids=guildIDS, description="Use the bot")
 @commands.cooldown(1, 5)
-@commands.has_any_role(*modRoleIDS)
+# @has_required_role(*modRoleIDS)
+@commands.check_any(has_required_role(*generalRoleIDS), commands.is_owner())
 @guild_only()
 # @correct_channel()
-async def usethebot(ctx: discord.ApplicationContext):
+@option(
+        "a1",
+        description="Directed at who? (userid)",
+        required=False)
+async def usethebot(ctx: discord.ApplicationContext, a1: str=None):
     """
     Shows embed to use the bot
 
@@ -393,12 +450,15 @@ async def usethebot(ctx: discord.ApplicationContext):
 
     """
     embed = discord.Embed(
-        title=f"This bot exists in case you find hackers in your lobby",
-        description=f"Use **/lobby**\nFor more info: https://discord.com/channels/760402578147115038/761205837880098816/1025861519713509376",
+        title="This bot exists in case you find hackers in your lobby",
+        description="Use **/lobby**\nFor more info: https://discord.com/channels/1000163670808068147/1000163671923765327",
         color=discord.Colour.blurple(), # Pycord provides a class with default colors you can choose from
     )
 
-    await ctx.respond(embed=embed)
+    if(a1):
+        await ctx.respond(f"Hey <@{a1}>", embed=embed)
+    else:
+        await ctx.respond(embed=embed)
 
 # Owner command
 
@@ -620,5 +680,8 @@ Generate embed output query
 def make_lines(output):
     for x in output:
         yield f"{x}\n"
+        
+    
+    
 
 bot.run(token)

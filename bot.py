@@ -203,7 +203,6 @@ async def on_application_command(ctx: discord.ApplicationContext):
 # User command
 @bot.slash_command(guild_ids=guildIDS, description="Create a lobby for other players to join")
 @commands.cooldown(1, 5)
-# @commands.has_role(*modRoleIDS)
 @guild_only()
 @correct_channel()
 @option(
@@ -224,7 +223,7 @@ async def on_application_command(ctx: discord.ApplicationContext):
 async def lobby(ctx: discord.ApplicationContext, code: str, description: str, hackers: bool):
     """
     Command for creation of lobbies. Stores every lobby in a sqlite database.
-    Cooldown: rate: 1, per: 10 seconds.
+    Cooldown: rate: 1, per: 5 seconds.
 
     Parameters
     ----------
@@ -265,7 +264,6 @@ async def lobby(ctx: discord.ApplicationContext, code: str, description: str, ha
 # /getlobby
 @bot.slash_command(guild_ids=guildIDS, description="Retrieve data from a lobby using either the lobby code or the lobby id")
 @commands.cooldown(1, 5)
-# @has_required_role(*modRoleIDS)
 @commands.check_any(has_required_role(*modRoleIDS), commands.is_owner())
 @guild_only()
 # @correct_channel()
@@ -316,7 +314,6 @@ async def getlobby(ctx: discord.ApplicationContext, code: str):
 # /getlobbys
 @bot.slash_command(guild_ids=guildIDS, description="Retrieve data from multiple lobbies at once. Only ever search 1 type of code at once.")
 @commands.cooldown(1, 5)
-# @has_required_role(*modRoleIDS)
 @commands.check_any(has_required_role(*modRoleIDS), commands.is_owner())
 @guild_only()
 # @correct_channel()
@@ -361,7 +358,6 @@ async def getlobbys(ctx: discord.ApplicationContext, codes: str):
 # /getperiod
 @bot.slash_command(guild_ids=guildIDS, description="Retrieve lobbies from a specified time period. Retrieves from now until specified without a2. (DMY)")
 @commands.cooldown(1, 5)
-# @has_required_role(*modRoleIDS)
 @commands.check_any(has_required_role(*modRoleIDS), commands.is_owner())
 @guild_only()
 # @correct_channel()
@@ -407,7 +403,6 @@ async def getperiod(ctx: discord.ApplicationContext, a1: str, a2: str=None):
 @bot.slash_command(guild_ids=guildIDS, description="Get stats")
 @commands.cooldown(1, 5)
 @guild_only()
-# @has_required_role(*modRoleIDS)
 @commands.check_any(has_required_role(*modRoleIDS), commands.is_owner())
 # @correct_channel()
 async def stats(ctx: discord.ApplicationContext):
@@ -429,16 +424,18 @@ async def stats(ctx: discord.ApplicationContext):
     await ctx.respond(embed=embed)
     
     
+# General commands
+    
 # /usethebot
 @bot.slash_command(guild_ids=guildIDS, description="Use the bot")
-@commands.cooldown(1, 5)
+@commands.cooldown(1, 20)
 # @has_required_role(*modRoleIDS)
 @commands.check_any(has_required_role(*generalRoleIDS), commands.is_owner())
 @guild_only()
-# @correct_channel()
+@correct_channel()
 @option(
         "a1",
-        description="Directed at who? (userid)",
+        description="Directed at who? userid or @",
         required=False)
 async def usethebot(ctx: discord.ApplicationContext, a1: str=None):
     """
@@ -456,7 +453,7 @@ async def usethebot(ctx: discord.ApplicationContext, a1: str=None):
     )
 
     if(a1):
-        await ctx.respond(f"Hey <@{a1}>", embed=embed)
+        await ctx.respond(f"Hey <@{a1.strip('<@>')}>", embed=embed)
     else:
         await ctx.respond(embed=embed)
 
@@ -485,6 +482,7 @@ async def query(ctx: discord.ApplicationContext, query: str):
     """
     if("drop table" in query.lower()):
         await ctx.respond("No dropping tables here", ephemeral=True)
+        return
 
     output = exc_query(query)
 

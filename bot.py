@@ -79,7 +79,7 @@ class ShowCodeButtonView(discord.ui.View): # Create a class called ShowCodeButto
         self.host = host
         self.hackers = hackers
         self.disabled = False
-        self.cd = commands.CooldownMapping(commands.Cooldown(18, 1), commands.BucketType.default) # Global
+        self.cd = commands.CooldownMapping(commands.Cooldown(18, 2), commands.BucketType.default) # Global
 
     async def on_timeout(self):
         self.clear_items()

@@ -79,7 +79,7 @@ class ShowCodeButtonView(discord.ui.View): # Create a class called ShowCodeButto
         self.host = host
         self.hackers = hackers
         self.disabled = False
-        self.cd = commands.CooldownMapping(commands.Cooldown(7, 4), commands.BucketType.member) # So for some reason this is still set to global.
+        self.cd = commands.CooldownMapping(commands.Cooldown(18, 1), commands.BucketType.default) # Global
 
     async def on_timeout(self):
         self.clear_items()
@@ -202,7 +202,7 @@ async def on_application_command(ctx: discord.ApplicationContext):
 
 # User command
 @bot.slash_command(guild_ids=guildIDS, description="Create a lobby for other players to join")
-@commands.cooldown(1, 5)
+@commands.cooldown(5, 2)
 @guild_only()
 @correct_channel()
 @option(

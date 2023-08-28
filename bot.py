@@ -213,7 +213,8 @@ async def on_application_command(ctx: discord.ApplicationContext):
 @option(
         "description",
         description="Type of match, for example: 'NM pods'",
-        required=True
+        required=False,
+        default=" "
         )
 @option(
         "hackers",
@@ -448,7 +449,7 @@ async def usethebot(ctx: discord.ApplicationContext, a1: str=None):
     """
     embed = discord.Embed(
         title="This bot exists in case you find hackers in your lobby",
-        description="Use **/lobby**\nFor more info: https://discord.com/channels/1000163670808068147/1000163671923765327",
+        description="Use **/lobby**\nFor more info: https://discord.com/channels/1000163670808068147/1000163671923765327/1139339639023476758",
         color=discord.Colour.blurple(), # Pycord provides a class with default colors you can choose from
     )
 

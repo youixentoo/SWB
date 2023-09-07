@@ -257,7 +257,7 @@ async def lobby(ctx: discord.ApplicationContext, code: str, description: str, ha
     db_primary_key = lobby_creation_db(sub_code.upper(), ctx.user.id, message_unix_time, unique_id)
     button_view = ShowCodeButtonView(code=sub_code, db_primary_key=db_primary_key, host=ctx.user.id, hackers=hackers)
     await ctx.delete()
-    button_view.message = await ctx.respond(view=button_view, embed=embed)
+    button_view.message = await ctx.send(view=button_view, embed=embed)
 
 
 # Moderation commands

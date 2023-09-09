@@ -424,6 +424,29 @@ async def stats(ctx: discord.ApplicationContext):
 
     await ctx.respond(embed=embed)
     
+        
+@bot.slash_command(guild_ids=guildIDS, description="Check permissions")      
+@commands.cooldown(1, 5)
+@guild_only()
+@commands.check_any(has_required_role(*modRoleIDS), commands.is_owner())
+async def perms(ctx: discord.ApplicationContext):
+    """
+    Shows channel permissions
+
+    Returns
+    -------
+    The enabled permissions for the channel the command is used in.
+
+    """
+    permissions = ctx.app_permissions
+        
+    embed = discord.Embed(
+        title="Permissions enabled",
+        description="{}".format("\n".join([permission for permission, value in permissions if value])),
+        color=discord.Colour.dark_teal(), 
+    )
+    await ctx.respond(embed=embed)
+    
     
 # General commands
     
@@ -457,6 +480,7 @@ async def usethebot(ctx: discord.ApplicationContext, a1: str=None):
         await ctx.respond(f"Hey <@{a1.strip('<@>')}>", embed=embed)
     else:
         await ctx.respond(embed=embed)
+        
 
 # Owner command
 
@@ -489,8 +513,8 @@ async def query(ctx: discord.ApplicationContext, query: str):
 
     if output:
         embed = discord.Embed(
-        description="{}".format("".join(make_lines(output))),
-        color=discord.Colour.blurple(), # Pycord provides a class with default colors you can choose from
+            description="{}".format("".join(make_lines(output))),
+            color=discord.Colour.blurple(), # Pycord provides a class with default colors you can choose from
         )
         await ctx.respond(embed=embed)
     else:

@@ -429,7 +429,12 @@ async def stats(ctx: discord.ApplicationContext):
 @commands.cooldown(1, 5)
 @guild_only()
 @commands.check_any(has_required_role(*modRoleIDS), commands.is_owner())
-async def perms(ctx: discord.ApplicationContext):
+@option(
+        "hidden",
+        description="Hidden",
+        required=False,
+        default=True)
+async def perms(ctx: discord.ApplicationContext, hidden: bool=True):
     """
     Shows channel permissions
 
@@ -445,7 +450,7 @@ async def perms(ctx: discord.ApplicationContext):
         description="{}".format("\n".join([permission for permission, value in permissions if value])),
         color=discord.Colour.dark_teal(), 
     )
-    await ctx.respond(embed=embed)
+    await ctx.respond(embed=embed, ephemeral=hidden)
     
     
 # General commands

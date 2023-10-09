@@ -273,7 +273,12 @@ async def lobby(ctx: discord.ApplicationContext, code: str, description: str, ha
         description="Lobby code or lobby id",
         required=True
         )
-async def getlobby(ctx: discord.ApplicationContext, code: str):
+@option(
+        "hidden",
+        description="Response hidden?",
+        required=False,
+        default=False)
+async def getlobby(ctx: discord.ApplicationContext, code: str, hidden: bool = False):
     """
     Staff command to search the database for single lobby codes.
     To be used with either the 6 letter codes or the 36 character UUID.t.
@@ -309,7 +314,7 @@ async def getlobby(ctx: discord.ApplicationContext, code: str):
         color=discord.Colour.blurple(), # Pycord provides a class with default colors you can choose from
     )
 
-    await ctx.respond(embed=embed)
+    await ctx.respond(embed=embed, ephemeral=hidden)
 
 
 # /getlobbys
@@ -524,7 +529,6 @@ async def query(ctx: discord.ApplicationContext, query: str):
         await ctx.respond(embed=embed)
     else:
         await ctx.respond(f"Query: {query} executed")
-
 
 # From here on it's database related functions
 

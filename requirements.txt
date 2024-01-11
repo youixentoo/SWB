@@ -1,4 +1,4 @@
-py-cord~=2.2.2
-python-dotenv~=0.20.0
-nest_asyncio~=1.5.5
-dateparser~=1.1.1
+py-cord~=2.4.1
+python-dotenv~=1.0.0
+nest_asyncio~=1.5.8
+dateparser~=1.1.8

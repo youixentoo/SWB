@@ -468,10 +468,10 @@ async def perms(ctx: discord.ApplicationContext, hidden: bool=True):
 @guild_only()
 @correct_channel()
 @option(
-        "a1",
+        "mention",
         description="Directed at who? userid or @",
         required=False)
-async def usethebot(ctx: discord.ApplicationContext, a1: str=None):
+async def usethebot(ctx: discord.ApplicationContext, mention: str=None):
     """
     Shows embed to use the bot
 
@@ -486,8 +486,8 @@ async def usethebot(ctx: discord.ApplicationContext, a1: str=None):
         color=discord.Colour.blurple(), # Pycord provides a class with default colors you can choose from
     )
 
-    if(a1):
-        await ctx.respond(f"Hey <@{a1.strip('<@>')}>", embed=embed)
+    if(mention):
+        await ctx.respond(f"Hey <@{mention.strip('<@>')}>", embed=embed)
     else:
         await ctx.respond(embed=embed)
         

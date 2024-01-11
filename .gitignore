@@ -2,12 +2,14 @@
 .env
 .env_live
 .env_beta
+.env*
 
 # Other
 storage.json
 db/
 files/
 *.dat
+*.bat
 
 # Byte-compiled / optimized / DLL files
 __pycache__/

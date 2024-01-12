@@ -23,11 +23,13 @@ from json import load
 from time import time
 from uuid import uuid4
 from dotenv import load_dotenv
-from sqlite3 import connect, IntegrityError, OperationalError
 from dateparser import parse as d_parse
 from discord import guild_only
 from discord.ext import commands
 from discord.commands import option
+from mysql.connector import connect
+from mysql.connector.errors import OperationalError, IntegrityError
+from db import get_db_connection
 
 
 """
@@ -59,8 +61,9 @@ intents.message_content = True
 
 # bot = commands.Bot(command_prefix='!', intents=intents)
 bot = discord.Bot(intents=intents)
-conn = connect(f'db{sep}storage.db')
-conn.execute("pragma foreign_keys = 1")
+### Legacy sqlite3 code ###
+# conn = connect(f'db{sep}storage.db')
+# conn.execute("pragma foreign_keys = 1")
 
 
 # Button class
@@ -304,7 +307,7 @@ async def getlobby(ctx: discord.ApplicationContext, code: str, hidden: bool = Fa
 
     lobby, host, date, *participants = match_data
     try:
-        part_list = set(f"<@{player}>" for player in participants[0].split(", "))
+        part_list = set(f"<@{player}>" for player in participants[0].split(","))
     except AttributeError:
         raise ExceptionDisplayMessage(f"Invalid search: {code}")
 
@@ -500,7 +503,12 @@ async def usethebot(ctx: discord.ApplicationContext, mention: str=None):
 @commands.is_owner()
 @guild_only()
 # @correct_channel()
-async def query(ctx: discord.ApplicationContext, query: str):
+@option(
+        "hidden",
+        description="Hidden",
+        required=False,
+        default=False)
+async def query(ctx: discord.ApplicationContext, query: str, hidden: bool=False):
     """
     Used to query the database using the bot.
     Owner only for obvious reasons.
@@ -526,9 +534,9 @@ async def query(ctx: discord.ApplicationContext, query: str):
             description="{}".format("".join(make_lines(output))),
             color=discord.Colour.blurple(), # Pycord provides a class with default colors you can choose from
         )
-        await ctx.respond(embed=embed)
+        await ctx.respond(embed=embed, ephemeral=hidden)
     else:
-        await ctx.respond(f"Query: {query} executed")
+        await ctx.respond(f"Query: {query} executed", ephemeral=hidden)
 
 # From here on it's database related functions
 
@@ -537,15 +545,16 @@ Called when a person creates a lobby.
 Creates a new entry in the database, lobby table, and adds the host to the participants table aswell.
 """
 def lobby_creation_db(lobby_code, host, unix_time, unique_id):
-    cur = conn.cursor()
+    conn = get_db_connection()
 
     with conn:
+        cur = conn.cursor()
         cur.execute(f"INSERT INTO LOBBY (CODE, HOST, DATE, UUID) VALUES('{lobby_code}', '{host}', {unix_time}, '{unique_id}')")
         primary_key = cur.lastrowid
         cur.execute(f"INSERT INTO PARTICIPANTS (ID, PLAYER) VALUES({primary_key}, '{host}')")
+        conn.commit()
 
     cur.close()
-
     return primary_key
 
 
@@ -554,13 +563,15 @@ Called when the 'Show code' button is pressed.
 Adds the person who clicked the button to the database.
 """
 def show_code_db(primary_key, player):
-    cur = conn.cursor()
+    conn = get_db_connection()
 
     with conn:
+        cur = conn.cursor()
         try:
             cur.execute(f"INSERT INTO PARTICIPANTS (ID, PLAYER) VALUES({primary_key}, '{player}')")
         except IntegrityError as sql_IE:
             pass
+        conn.commit()
 
     cur.close()
 
@@ -590,10 +601,13 @@ def to_tsv(T):
 Retrieve data from 1 lobby based on a lobby code
 """
 def get_lobby_code_db(lobby_code):
-    cur = conn.cursor()
-    data = cur.execute(f"select l.code, l.host, l.date, group_concat(p.player, ', ') from lobby l left join participants p on l.id = p.id where l.code = '{lobby_code}'")
-    l_data = list(data)[0]
-    cur.close()
+    conn = get_db_connection()
+    with conn:
+        cur = conn.cursor()
+        cur.execute(f"SELECT l.CODE, l.HOST, l.DATE, GROUP_CONCAT(p.PLAYER) from LOBBY l LEFT JOIN PARTICIPANTS p on l.ID = p.ID WHERE l.CODE = '{lobby_code}'")
+        data = cur.fetchall()
+        l_data = list(data)[0]
+        cur.close()
     return l_data
 
 
@@ -602,31 +616,40 @@ Retrieve data based on multiple lobby codes
 """
 def get_lobby_codes_db(lobby_codes):
     upper_codes = tuple(map(str.upper, lobby_codes))
-    cur = conn.cursor()
-    data = cur.execute(f"select l.date, l.code, l.host, group_concat(p.player, '\t') from lobby l left join participants p on l.id = p.id where l.code in {upper_codes} group by l.code")
-    format_output(data)
-    cur.close()
+    conn = get_db_connection()
+    with conn:
+        cur = conn.cursor()
+        cur.execute(f"SELECT l.CODE, l.HOST, l.DATE, GROUP_CONCAT(p.PLAYER SEPARATOR '\t') from LOBBY l LEFT JOIN PARTICIPANTS p on l.ID = p.ID WHERE l.CODE in {upper_codes} GROUP BY l.CODE")
+        data = cur.fetchall()
+        format_output(data)
+        cur.close()
 
 
 """
 Retrieve data from 1 lobby based on a UUID
 """
 def get_uuid_code_db(uuid_code):
-    cur = conn.cursor()
-    data = cur.execute(f"select l.uuid, l.host, l.date, group_concat(p.player, ', ') from lobby l left join participants p on l.id = p.id where l.uuid = '{uuid_code}'")
-    l_data = list(data)[0]
-    cur.close()
-    return l_data
+    conn = get_db_connection()
+    with conn:
+        cur = conn.cursor()
+        cur.execute(f"SELECT l.UUID, l.HOST, l.DATE, GROUP_CONCAT(p.PLAYER) from LOBBY l LEFT JOIN PARTICIPANTS p on l.ID = p.ID WHERE l.UUID = '{uuid_code}'")
+        data = cur.fetchall()
+        l_data = list(data)[0]
+        cur.close()
+        return l_data
 
 
 """
 Retrieve data based on multiple UUIDs
 """
 def get_uuid_codes_db(uuid_codes):
-    cur = conn.cursor()
-    data = cur.execute(f"select l.date, l.code, l.host, group_concat(p.player, '\t') from lobby l left join participants p on l.id = p.id where l.uuid in {uuid_codes} group by l.id")
-    format_output(data)
-    cur.close()
+    conn = get_db_connection()
+    with conn:
+        cur = conn.cursor()
+        cur.execute(f"SELECT l.DATE, l.CODE, l.HOST, GROUP_CONCAT(p.PLAYER SEPARATOR '\t') from LOBBY l LEFT JOIN PARTICIPANTS p on l.ID = p.ID WHERE l.UUID in {uuid_codes} GROUP BY l.ID")
+        data = cur.fetchall()
+        format_output(data)
+        cur.close()
 
 
 """
@@ -665,22 +688,28 @@ def get_unix_double(arg1, arg2):
 Date selection database query
 """
 def get_period_db(unix_start, unix_end):
-    cur = conn.cursor()
-    data = cur.execute(f"select l.date, l.code, l.host, group_concat(p.player, '\t') from lobby l left join participants p on l.id = p.id where l.date > {unix_start} and l.date < {unix_end} group by l.code")
-    format_output(data)
-    cur.close()
+    conn = get_db_connection()
+    with conn:
+        cur = conn.cursor()
+        cur.execute(f"SELECT l.DATE, l.CODE, l.HOST, GROUP_CONCAT(p.player SEPARATOR '\t') from LOBBY l LEFT JOIN PARTICIPANTS p ON l.ID = p.ID WHERE l.DATE > {unix_start} and l.DATE < {unix_end} GROUP BY l.CODE")
+        data = cur.fetchall()
+        format_output(data)
+        cur.close()
 
 
 """
 Count some data
 """
 def count_command():
-    cur = conn.cursor()
+    conn = get_db_connection()
 
-    data = cur.execute("select count(id) from lobby")
-    rows,*_ = data.fetchone()
-    groups = cur.execute("select player from participants")
-    players = len(set(unpack_tuple(groups)))
+    with conn:  
+        cur = conn.cursor()
+        cur.execute("SELECT COUNT(ID) from LOBBY")
+        rows,*_ = cur.fetchone()
+        cur.execute("SELECT PLAYER from PARTICIPANTS")
+        groups = cur.fetchall()
+        players = len(set(unpack_tuple(groups)))
 
     cur.close()
     return (rows, players)
@@ -699,10 +728,13 @@ def unpack_tuple(single_tuple):
 Query DB
 """
 def exc_query(query):
-    cur = conn.cursor()
-    data = cur.execute(query)
-    output = data.fetchall()
-    cur.close()
+    conn = get_db_connection()
+    with conn:
+        cur = conn.cursor()
+        cur.execute(query)
+        output = cur.fetchall()
+        cur.close()
+        conn.commit()
     return output
 
 

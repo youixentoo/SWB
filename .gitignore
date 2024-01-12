@@ -10,6 +10,7 @@ db/
 files/
 *.dat
 *.bat
+commands_db.py
 
 # Byte-compiled / optimized / DLL files
 __pycache__/

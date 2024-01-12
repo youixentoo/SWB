@@ -29,25 +29,85 @@ conn.execute('''CREATE TABLE PARTICIPANTS
               FOREIGN KEY(ID) REFERENCES LOBBY(ID),
               UNIQUE(ID, PLAYER));''')
 
+
+DELETE FROM LOBBY WHERE CODE = '<>';
+
 """
 import sqlite3
 import time
 import datetime
 import dateparser
 import csv
+import mysql.connector
+from dotenv import load_dotenv
+from os import getenv
+from db import get_db_connection
+
+load_dotenv()
 
 def main():
-    conn = sqlite3.connect('db/storage.db')
-    cur = conn.cursor()
-    print("Opened database successfully");
+    # db_config={"user":getenv("DB_user"), 
+    #         "password":getenv("DB_pass"),
+    #         "host":'sql.ferox.host',
+    #         "database":'s30605_lobby_data'}
+    
+    # # print(type(db_config))
+    
+    # connection = mysql.connector.connect(**db_config)
+    connection = get_db_connection()
+    print("Opened database successfully")
+    cursor = connection.cursor()
+
+    # lobby_creation_command(cursor, connection)
+
+    cursor.execute(f"SELECT l.CODE, l.HOST, l.DATE, GROUP_CONCAT(p.PLAYER, ', ') from LOBBY l LEFT JOIN PARTICIPANTS p on l.ID = p.ID where l.CODE = 'GTHTDE'")
+    data = cursor.fetchall()[0]
+    print(data)
+
+
+    cursor.close()
+    connection.close()
+
+    # conn = sqlite3.connect('db/storage.db')
+    # cur = conn.cursor()
+
+    # data2 = cur.execute(f"SELECT l.CODE, l.HOST, l.DATE, GROUP_CONCAT(p.PLAYER, ', ') from LOBBY l LEFT JOIN PARTICIPANTS p on l.ID = p.ID where l.CODE = 'AAAAAA'")
+    # l_data = list(data2)[0]
+    # print(l_data)
+
+    # cur.close()
+    # conn.close()
     
     # show_code_command(cur, conn)
     # select_command(conn, cur)
-    mess = count_command(conn, cur)
-    print(mess)
+    # mess = count_command(conn, cur)
+    # print(mess)
     
-    cur.close()
-    conn.close()
+    
+
+def lobby_creation_command(cur, conn):
+    match_id = "GTHTDD"
+    host = "youixentoo#6937"
+    unix_time = 1661431653
+    unique_id = "c3ee1b7c-6496-4286-b8db-caaa03ce903d"
+    
+    player_show = "youixentoo#6937"
+    
+    # cur.execute("""INSERT INTO LOBBY(CODE, HOST, DATE, UUID)
+    #                 VALUES(
+    #                     'GTHTDE',
+    #                     'youixentoo',
+    #                     1661431650,
+    #                     'c3ee1b7c-6496-4286-b8db-caaa03ce903c'
+    #                 )""")
+    # part_key = cur.lastrowid
+    # cur.execute(f"INSERT INTO PARTICIPANTS (ID, PLAYER) VALUES({part_key}, '{player_show}')")
+
+    cur.execute(f"INSERT INTO LOBBY (CODE, HOST, DATE, UUID) VALUES('{match_id}', '{host}', {unix_time}, '{unique_id}')")
+    part_key = cur.lastrowid
+    cur.execute(f"INSERT INTO PARTICIPANTS (ID, PLAYER) VALUES({part_key}, '{player_show}')")
+    
+    conn.commit()
     
     
 def count_command(conn, cur):
@@ -83,8 +143,10 @@ def select_command(conn, cur):
     unix_start = int(dt.timestamp())
     unix_end = int(time.time())
         
+    data = cur.execute(f"SELECT l.DATE, l.CODE, l.HOST, GROUP_CONCAT(p.player, '\t') FROM LOBBY l LEFT JOIN PARTICIPANTS p ON l.ID = p.ID GROUP BY l.ID")
+    # data = cur.execute(f"SELECT l.DATE, l.CODE, l.HOST, GROUP_CONCAT(p.player, '\t') FROM LOBBY l LEFT JOIN PARTICIPANTS p ON l.ID = p.ID GROUP BY l.ID")
     
-    data = cur.execute(f"select l.date, l.code, l.host, group_concat(p.player, '\t') from lobby l left join participants p on l.id = p.id where l.date > {unix_start} and l.date < {unix_end} group by l.id")
+    # data = cur.execute(f"SELECT l.date, l.code, l.host, GROUP_CONCAT(p.player, '\t') FROM LOBBY l LEFT JOIN PARTICIPANTS p ON l.id = p.id where l.date > {unix_start} and l.date < {unix_end} group by l.id")
     # data = cur.execute(f"select l.code, group_concat(p.player || '; ' || p.playerid, ', ') from lobby l left join participants p on l.id = p.id where l.code = '{lobby_code}'")
     # data = cur.execute(f"select l.code, group_concat(p.player, ', ') from lobby l left join participants p on l.id = p.id where l.uuid in {mult_codes} group by l.id")
     foramtted = format_output(data)
@@ -105,21 +167,7 @@ def to_tsv(T):
     for x in T:
         a,b,c,joined = x
         yield (a, b, c, *joined.split("\t"))
-        
-
-def lobby_creation_command(cur, conn):
-    match_id = "GTHTDE"
-    host = "youixentoo#6937"
-    unix_time = 1661431650
-    unique_id = "c3ee1b7c-6496-4286-b8db-caaa03ce903c"
     
-    player_show = "youixentoo#6937"
-    
-    cur.execute(f"INSERT INTO LOBBY (CODE, HOST, DATE, UUID) VALUES('{match_id}', '{host}', {unix_time}, '{unique_id}')")
-    part_key = cur.lastrowid
-    cur.execute(f"INSERT INTO PARTICIPANTS (ID, PLAYER) VALUES({part_key}, '{player_show}')")
-    
-    conn.commit()
     
 def show_code_command(cur, conn, primary_key=1):
     player_show = "other#0001"

@@ -16,7 +16,7 @@ nest_asyncio.apply()
 import logging
 import discord
 from os import getenv, sep
-from re import sub, UNICODE
+from re import sub, UNICODE, findall
 from csv import writer
 from functools import partial
 from json import load
@@ -55,6 +55,7 @@ channelIDS = settings["channelIDS"]
 modRoleIDS = settings["modRoleIDS"]
 generalRoleIDS = settings["generalRoleIDS"]
 hackerRoleID = settings["hackerRoleID"]
+bypassIDS = settings["bypassIDS"]
 
 intents = discord.Intents.default()
 intents.message_content = True
@@ -95,8 +96,8 @@ class ShowCodeButtonView(discord.ui.View): # Create a class called ShowCodeButto
         retry_after = bucket.update_rate_limit()
         if retry_after:
             return await interaction.response.send_message(f"Too many requests. Try again in: {round(retry_after, 1)} seconds.", ephemeral=True)
-
-        if interaction.user.id == 281493155377840128 or not bool(interaction.user.get_role(hackerRoleID)): # Check if the person has hacker role # 'other' role in test server: 1027299501356093562
+        # == 281493155377840128
+        if interaction.user.id in bypassIDS or not bool(interaction.user.get_role(hackerRoleID)): # Check if the person has hacker role # 'other' role in test server: 1027299501356093562
             show_code_db(self.db_primary_key, interaction.user.id)
             await interaction.response.send_message(content=self.code.upper(), ephemeral=True) # Send a message when the button is clicked       
         else:
@@ -107,7 +108,7 @@ class ShowCodeButtonView(discord.ui.View): # Create a class called ShowCodeButto
         if(str(interaction.user.id) == str(self.host)):
             self.clear_items()
             self.disabled = True
-            await interaction.response.edit_message(content="Match closed", view=self)
+            await interaction.response.edit_message(content=f"{interaction.message.content}\nMatch closed", view=self)
         else:
             await interaction.response.send_message(content="You're not the host of this match and therefore don't have permission to close it", ephemeral=True) # Send a message when the button is clicked
 
@@ -252,15 +253,17 @@ async def lobby(ctx: discord.ApplicationContext, code: str, description: str, ha
 
     message_unix_time = int(time())
     unique_id = uuid4()
+    findall_role_tags = " ".join(findall("<@&\d+>", description))
+
     embed = discord.Embed(
-        title=description,
+        title=sub("<@&\d+>", "", description),
         description=f"**Host:** <@{ctx.user.id}>\n**ID:** `{unique_id}`",
         color=discord.Colour.blurple(), # Pycord provides a class with default colors you can choose from
     )
     db_primary_key = lobby_creation_db(sub_code.upper(), ctx.user.id, message_unix_time, unique_id)
     button_view = ShowCodeButtonView(code=sub_code, db_primary_key=db_primary_key, host=ctx.user.id, hackers=hackers)
     await ctx.delete()
-    button_view.message = await ctx.send(view=button_view, embed=embed)
+    button_view.message = await ctx.send(content=findall_role_tags, view=button_view, embed=embed)
 
 
 # Moderation commands

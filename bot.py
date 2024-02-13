@@ -55,6 +55,7 @@ channelIDS = settings["channelIDS"]
 modRoleIDS = settings["modRoleIDS"]
 generalRoleIDS = settings["generalRoleIDS"]
 hackerRoleID = settings["hackerRoleID"]
+bypassIDS = settings["bypassIDS"]
 
 intents = discord.Intents.default()
 intents.message_content = True
@@ -95,8 +96,8 @@ class ShowCodeButtonView(discord.ui.View): # Create a class called ShowCodeButto
         retry_after = bucket.update_rate_limit()
         if retry_after:
             return await interaction.response.send_message(f"Too many requests. Try again in: {round(retry_after, 1)} seconds.", ephemeral=True)
-
-        if interaction.user.id == 281493155377840128 or not bool(interaction.user.get_role(hackerRoleID)): # Check if the person has hacker role # 'other' role in test server: 1027299501356093562
+        # == 281493155377840128
+        if interaction.user.id in bypassIDS or not bool(interaction.user.get_role(hackerRoleID)): # Check if the person has hacker role # 'other' role in test server: 1027299501356093562
             show_code_db(self.db_primary_key, interaction.user.id)
             await interaction.response.send_message(content=self.code.upper(), ephemeral=True) # Send a message when the button is clicked       
         else:

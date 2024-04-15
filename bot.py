@@ -317,7 +317,7 @@ async def getlobby(ctx: discord.ApplicationContext, code: str, hidden: bool = Fa
     embed = discord.Embed(
         title=f"Code: {lobby}",
         description=f"**Host:** <@{host}>\n**Participants:** {', '.join(part_list)}\n**Date:** <t:{date}>",
-        color=discord.Colour.blurple(), # Pycord provides a class with default colors you can choose from
+        color=discord.Colour.dark_blue(), # Pycord provides a class with default colors you can choose from
     )
 
     await ctx.respond(embed=embed, ephemeral=hidden)
@@ -331,10 +331,15 @@ async def getlobby(ctx: discord.ApplicationContext, code: str, hidden: bool = Fa
 # @correct_channel()
 @option(
         "codes",
-        description="Multiple lobby codes or lobby ids, seperated with a space",
+        description="Multiple lobby codes or lobby ids, seperated with a space (Copy-paste from /getuser works)",
         required=True
         )
-async def getlobbys(ctx: discord.ApplicationContext, codes: str):
+@option(
+        "hidden",
+        description="Response hidden?",
+        required=False,
+        default=False)
+async def getlobbys(ctx: discord.ApplicationContext, codes: str, hidden: bool=False):
     """
     Staff command to search the database for multiple lobby codes.
     To be used with either the 6 letter codes or the 36 character UUIDs.
@@ -354,61 +359,77 @@ async def getlobbys(ctx: discord.ApplicationContext, codes: str):
 
     try:
         if(sum_l / len(t_codes) == 6):
-            get_lobby_codes_db(t_codes)
+            data = get_lobby_codes_db(t_codes)
         elif(sum_l / len(t_codes) == 36):
-            get_uuid_codes_db(t_codes)
+            data = get_uuid_codes_db(t_codes)
         else:
             await ctx.respond("Please enter valid codes", ephemeral=True)
             return
     except OperationalError:
         raise ExceptionDisplayMessage("Select more than 1 code please")
 
-    response = discord.File("files/lobby_data.txt")
-    await ctx.respond(file=response)
+    embed = discord.Embed(
+        title=f"Data for lobbies",
+        description="{}".format("\n\n".join(format_output_embed(data))),
+        color=discord.Colour.dark_blue(), # Pycord provides a class with default colors you can choose from
+    )
+
+    await ctx.respond(embed=embed, ephemeral=hidden)
+    # response = discord.File("files/lobby_data.txt")
+    # await ctx.respond(file=response)
 
 
-# /getperiod
-@bot.slash_command(guild_ids=guildIDS, description="Retrieve lobbies from a specified time period. Retrieves from now until specified without a2. (DMY)")
+# /getuser
+@bot.slash_command(guild_ids=guildIDS, description="Retrieve the last few lobbies a user has viewed the code for. Min 2, max 20")
 @commands.cooldown(1, 5)
 @commands.check_any(has_required_role(*modRoleIDS), commands.is_owner())
 @guild_only()
 # @correct_channel()
 @option(
-        "a1",
-        description="First date, also supports for example: 20m, 3h, or 5d",
+        "user",
+        description="Player discord id",
         required=True)
 @option(
-        "a2",
-        description="Second date",
+        "amount",
+        description="Amount of lobbies (max 20)",
         required=False,
-        default=None)
-async def getperiod(ctx: discord.ApplicationContext, a1: str, a2: str=None):
+        default=2)
+@option(
+        "hidden",
+        description="Response hidden?",
+        required=False,
+        default=False)
+async def getuser(ctx: discord.ApplicationContext, user: str, amount: int=2, hidden: bool=False):
     """
     Staff command to search the database for lobby codes.
-    This command is based on time/dates.
+    This command is based on the user's id
 
     Parameters
     ----------
-    a1 : str
-        The first date to search, either in dd/mm/yyyy format or relative with {num}m/h/d.
-    a2 : str, optional
-        If specified, searches until this date. The default is None.
+    user : str
+        The user's discord id
+    amount : int, optional
+        If specified, returns this amount of lobbies. The default is 2.
 
     Returns
     -------
-    Data from the matches as a .tsv file.
+    List of match ids
 
     """
-    try:
-        if(a2):
-            get_unix_double(a1, a2)
-        else:
-            get_unix_single(a1)
-    except AttributeError:
-        raise ExceptionDisplayMessage("Invalid date selected")
+    if amount < 2 or amount > 20:
+        raise ExceptionDisplayMessage("Amount needs to be 2-20") 
 
-    response = discord.File("files/lobby_data.txt")
-    await ctx.respond(file=response)
+
+    lobbies = get_lobbies_user(user, amount)
+    if lobbies:
+        embed = discord.Embed(
+            title=f"Lobby ids for user:",
+            description="<@{}>\n\n{}".format(user, "".join(embed_lines(lobbies))),
+            color=discord.Colour.dark_blue(), # Pycord provides a class with default colors you can choose from
+        )
+        await ctx.respond(embed=embed, ephemeral=hidden)
+    else:
+        await ctx.respond(f"No data found for user id: {user}", ephemeral=hidden)
 
 
 # /stats
@@ -430,7 +451,7 @@ async def stats(ctx: discord.ApplicationContext):
     embed = discord.Embed(
         title="Logged stats",
         description=f"Lobbies: {stats[0]}\nPlayers: {stats[1]}",
-        color=discord.Colour.blurple(), # Pycord provides a class with default colors you can choose from
+        color=discord.Colour.dark_teal(), # Pycord provides a class with default colors you can choose from
     )
 
     await ctx.respond(embed=embed)
@@ -489,7 +510,7 @@ async def usethebot(ctx: discord.ApplicationContext, mention: str=None):
     embed = discord.Embed(
         title="This bot exists in case you find hackers in your lobby",
         description="Use **/lobby**\nFor more info: https://discord.com/channels/1000163670808068147/1000163671923765327/1139339639023476758",
-        color=discord.Colour.blurple(), # Pycord provides a class with default colors you can choose from
+        color=discord.Colour.brand_green(), # Pycord provides a class with default colors you can choose from
     )
 
     if(mention):
@@ -535,7 +556,7 @@ async def query(ctx: discord.ApplicationContext, query: str, hidden: bool=False)
     if output:
         embed = discord.Embed(
             description="{}".format("".join(make_lines(output))),
-            color=discord.Colour.blurple(), # Pycord provides a class with default colors you can choose from
+            color=discord.Colour.dark_green(), # Pycord provides a class with default colors you can choose from
         )
         await ctx.respond(embed=embed, ephemeral=hidden)
     else:
@@ -577,6 +598,15 @@ def show_code_db(primary_key, player):
         conn.commit()
 
     cur.close()
+
+"""
+Formats the output data to be viewed in a discord embed.
+Max x lobbies due to description length limits. 
+"""
+def format_output_embed(sql_data):
+    for unix, code, host, participants in sql_data:
+        part_list = set(f"<@{player}>" for player in participants.split(","))
+        yield f"**Code:** {code}\n**Host:** <@{host}>\n**Participants:** {', '.join(part_list)}\n**Date:** <t:{unix}>"
 
 
 """
@@ -622,10 +652,10 @@ def get_lobby_codes_db(lobby_codes):
     conn = get_db_connection()
     with conn:
         cur = conn.cursor()
-        cur.execute(f"SELECT l.CODE, l.HOST, l.DATE, GROUP_CONCAT(p.PLAYER SEPARATOR '\t') from LOBBY l LEFT JOIN PARTICIPANTS p on l.ID = p.ID WHERE l.CODE in {upper_codes} GROUP BY l.CODE")
+        cur.execute(f"SELECT l.DATE, l.CODE, l.HOST, GROUP_CONCAT(p.PLAYER) from LOBBY l LEFT JOIN PARTICIPANTS p on l.ID = p.ID WHERE l.CODE in {upper_codes} GROUP BY l.CODE")
         data = cur.fetchall()
-        format_output(data)
         cur.close()
+    return data
 
 
 """
@@ -649,56 +679,23 @@ def get_uuid_codes_db(uuid_codes):
     conn = get_db_connection()
     with conn:
         cur = conn.cursor()
-        cur.execute(f"SELECT l.DATE, l.CODE, l.HOST, GROUP_CONCAT(p.PLAYER SEPARATOR '\t') from LOBBY l LEFT JOIN PARTICIPANTS p on l.ID = p.ID WHERE l.UUID in {uuid_codes} GROUP BY l.ID")
+        cur.execute(f"SELECT l.DATE, l.UUID, l.HOST, GROUP_CONCAT(p.PLAYER) from LOBBY l LEFT JOIN PARTICIPANTS p on l.ID = p.ID WHERE l.UUID in {uuid_codes} GROUP BY l.ID")
         data = cur.fetchall()
-        format_output(data)
         cur.close()
+    return data
 
 
 """
-Convert the {num}m/h/d commands to one dateparser actually understands
-Also handles the use of single date selection
+Retrieve the last x amount of lobbies a user viewed
 """
-def get_unix_single(argument):
-    if(argument[-1] == "m"):
-        datestr = f"{argument[:-1]} min ago"
-    elif(argument[-1] == "h"):
-        datestr = f"{argument[:-1]} hours ago"
-    elif(argument[-1] == "d"):
-        datestr = f"{argument[:-1]} days ago"
-    else:
-        datestr = argument
-
-    dt = d_parse(datestr, settings={'DATE_ORDER': 'MDY'})
-    unix_start = int(dt.timestamp())
-    unix_end = int(time())
-    return get_period_db(unix_start, unix_end)
-
-
-"""
-Handles double date selection
-"""
-def get_unix_double(arg1, arg2):
-    dt1 = d_parse(arg1, settings={'DATE_ORDER': 'MDY'})
-    dt2 = d_parse(arg2, settings={'DATE_ORDER': 'MDY'})
-
-    unix_start = int(dt1.timestamp())
-    unix_end = int(dt2.timestamp())
-    return get_period_db(unix_start, unix_end)
-
-
-"""
-Date selection database query
-"""
-def get_period_db(unix_start, unix_end):
+def get_lobbies_user(user_id, amount):
     conn = get_db_connection()
     with conn:
         cur = conn.cursor()
-        cur.execute(f"SELECT l.DATE, l.CODE, l.HOST, GROUP_CONCAT(p.player SEPARATOR '\t') from LOBBY l LEFT JOIN PARTICIPANTS p ON l.ID = p.ID WHERE l.DATE > {unix_start} and l.DATE < {unix_end} GROUP BY l.CODE")
+        cur.execute(f"SELECT l.UUID from LOBBY l LEFT JOIN PARTICIPANTS p on l.ID = p.ID WHERE p.PLAYER = '{user_id}' ORDER BY l.ID DESC LIMIT {amount}")
         data = cur.fetchall()
-        format_output(data)
         cur.close()
-
+    return data
 
 """
 Count some data
@@ -747,6 +744,15 @@ Generate embed output query
 def make_lines(output):
     for x in output:
         yield f"{x}\n"
+
+
+"""
+Generate embed lines
+"""
+def embed_lines(output):
+    for x in output:
+        yield f"{x[0]}\n"
+
         
     
     

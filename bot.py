@@ -87,7 +87,7 @@ class ShowCodeButtonView(discord.ui.View): # Create a class called ShowCodeButto
 
     async def on_timeout(self):
         self.clear_items()
-        await self.message.edit(content="Match closed", view=self)
+        await self.message.edit(content=f"{self.message.content}\nMatch closed", view=self)
 
     @discord.ui.button(label="Show code", style=discord.ButtonStyle.primary) # Create a button with a label with color Blurple
     async def button_callback(self, button, interaction):

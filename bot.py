@@ -97,7 +97,7 @@ class ShowCodeButtonView(discord.ui.View): # Create a class called ShowCodeButto
         if retry_after:
             return await interaction.response.send_message(f"Too many requests. Try again in: {round(retry_after, 1)} seconds.", ephemeral=True)
         # == 281493155377840128
-        if interaction.user.id in bypassIDS or not bool(interaction.user.get_role(hackerRoleID)): # Check if the person has hacker role # 'other' role in test server: 1027299501356093562
+        if interaction.user.id in bypassIDS or hacker_check(bool(interaction.user.get_role(hackerRoleID)), self.hackers): # Check if the person has hacker role # 'other' role in test server: 1027299501356093562
             show_code_db(self.db_primary_key, interaction.user.id)
             await interaction.response.send_message(content=self.code.upper(), ephemeral=True) # Send a message when the button is clicked       
         else:
@@ -117,6 +117,16 @@ class ShowCodeButtonView(discord.ui.View): # Create a class called ShowCodeButto
 # Custom class to easily display message
 class ExceptionDisplayMessage(Exception):
     pass
+
+
+"""
+Check person has hacker and whether they can view the code
+"""
+def hacker_check(hasHacker, allowHackers):
+    if hasHacker:
+        return hasHacker == allowHackers
+    else:
+        return True
 
 
 """

@@ -4,8 +4,6 @@ Created on Sun Aug 14 11:02:45 2022
 
 @author: youixentoo
 
-Restrict access in server settings
-
 TODO: Fix rate limits to be per person
 
 """
@@ -51,7 +49,6 @@ load_dotenv()
 token = getenv("TOKEN")
 settings = load_settings()
 guildIDS = settings["guildIDS"]
-channelIDS = settings["channelIDS"]
 modRoleIDS = settings["modRoleIDS"]
 generalRoleIDS = settings["generalRoleIDS"]
 hackerRoleID = settings["hackerRoleID"]
@@ -130,15 +127,6 @@ def hacker_check(hasHacker, allowHackers):
 
 
 """
-Check if the channel is correct
-"""
-def correct_channel():
-    def predicate(ctx):
-        return ctx.channel_id in channelIDS
-    return commands.check(predicate)
-
-
-"""
 Override of commands.has_any_role()
 No longer of type Callable
 """
@@ -196,6 +184,8 @@ async def on_application_command_error(ctx: discord.ApplicationContext, error: d
         await ctx.respond("You can't use this command here", ephemeral=True)
     elif isinstance(error, commands.CheckAnyFailure):
         await ctx.respond("You don't have access to this command", ephemeral=True)
+    elif isinstance(error, commands.errors.BotMissingPermissions):
+        await ctx.respond("This command can't be used here", ephemeral=True)
     else:
         embed = discord.Embed(
             title="An error occurred",
@@ -218,7 +208,7 @@ async def on_application_command(ctx: discord.ApplicationContext):
 @bot.slash_command(guild_ids=guildIDS, description="Create a lobby for other players to join")
 @commands.cooldown(5, 2)
 @guild_only()
-@correct_channel()
+@commands.bot_has_permissions(view_channel=True)
 @option(
         "code",
         description="6 letter match code",
@@ -283,7 +273,6 @@ async def lobby(ctx: discord.ApplicationContext, code: str, description: str, ha
 @commands.cooldown(1, 5)
 @commands.check_any(has_required_role(*modRoleIDS), commands.is_owner())
 @guild_only()
-# @correct_channel()
 @option(
         "code",
         description="Lobby code or lobby id",
@@ -338,7 +327,6 @@ async def getlobby(ctx: discord.ApplicationContext, code: str, hidden: bool = Fa
 @commands.cooldown(1, 5)
 @commands.check_any(has_required_role(*modRoleIDS), commands.is_owner())
 @guild_only()
-# @correct_channel()
 @option(
         "codes",
         description="Multiple lobby codes or lobby ids, seperated with a space (Copy-paste from /getuser works)",
@@ -394,7 +382,6 @@ async def getlobbys(ctx: discord.ApplicationContext, codes: str, hidden: bool=Fa
 @commands.cooldown(1, 5)
 @commands.check_any(has_required_role(*modRoleIDS), commands.is_owner())
 @guild_only()
-# @correct_channel()
 @option(
         "user",
         description="Player discord id",
@@ -447,7 +434,6 @@ async def getuser(ctx: discord.ApplicationContext, user: str, amount: int=2, hid
 @commands.cooldown(1, 5)
 @guild_only()
 @commands.check_any(has_required_role(*modRoleIDS), commands.is_owner())
-# @correct_channel()
 async def stats(ctx: discord.ApplicationContext):
     """
     Shows some stats
@@ -503,7 +489,7 @@ async def perms(ctx: discord.ApplicationContext, hidden: bool=True):
 # @has_required_role(*modRoleIDS)
 @commands.check_any(has_required_role(*generalRoleIDS), commands.is_owner())
 @guild_only()
-@correct_channel()
+@commands.bot_has_permissions(view_channel=True)
 @option(
         "mention",
         description="Directed at who? userid or @",
@@ -536,7 +522,6 @@ async def usethebot(ctx: discord.ApplicationContext, mention: str=None):
 @commands.cooldown(1, 5)
 @commands.is_owner()
 @guild_only()
-# @correct_channel()
 @option(
         "hidden",
         description="Hidden",

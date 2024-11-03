@@ -504,8 +504,10 @@ async def usethebot(ctx: discord.ApplicationContext, mention: str=None):
 
     """
     embed = discord.Embed(
-        title="This bot exists in case you find hackers in your lobby",
-        description="Use **/lobby**\nFor more info: https://discord.com/channels/1000163670808068147/1000163671923765327/1139339639023476758",
+        title="Use Lobby Bot to safely host lobbies",
+        description="""This bot is a protection against [[box-spawners]](<https://discord.com/channels/1000163670808068147/1000163671923765327/1201595194559184926>), rule-12-breaking hackers, and other problematic users, and is also a convenient way to share your lobby with other players.
+        Use **/lobby** to share your code.
+        [[More info + video guide]](<https://discord.com/channels/1000163670808068147/1000163671923765327/1139339639023476758>)""",
         color=discord.Colour.brand_green(), # Pycord provides a class with default colors you can choose from
     )
 

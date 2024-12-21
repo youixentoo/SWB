@@ -17,7 +17,7 @@ from os import getenv, sep
 from re import sub, UNICODE, findall
 from csv import writer
 from functools import partial
-from json import load
+from json import load, dump
 from time import time
 from uuid import uuid4
 from dotenv import load_dotenv
@@ -53,6 +53,8 @@ modRoleIDS = settings["modRoleIDS"]
 generalRoleIDS = settings["generalRoleIDS"]
 hackerRoleID = settings["hackerRoleID"]
 bypassIDS = settings["bypassIDS"]
+checkLobbyCodes = settings["lobbyCodesDetection"]
+checkHackerNames = settings["hackerNameDetection"]
 
 intents = discord.Intents.default()
 intents.message_content = True
@@ -752,6 +754,147 @@ def embed_lines(output):
 
         
     
+"""
+############################# Change Settings ####################################
+"""
+# /features
+@bot.slash_command(guild_ids=guildIDS, description="Enable or disable optional features (Not yet implemented but the command exists)")
+@commands.cooldown(1, 5)
+@commands.check_any(has_required_role(*modRoleIDS), commands.is_owner())
+@guild_only()
+@option(
+        "feature",
+        description="Feature to change",
+        choices=["lobbyCodesDetection", "hackerNameDetection"])
+@option(
+        "enabled",
+        description="Enable or disable")
+async def features(ctx: discord.ApplicationContext, feature: str, enabled: bool):
+    edit_setting(feature, enabled)
+    reload_settings()
+    await ctx.respond(f"{feature}: {enabled}", ephemeral=True)
+
+
+# /reload_settings
+@bot.slash_command(guild_ids=guildIDS, description="Reload bot settings (Usefulness for staff not implemented)")
+@commands.cooldown(1, 5)
+@commands.check_any(has_required_role(*modRoleIDS), commands.is_owner())
+@guild_only()
+async def reload_settings(ctx: discord.ApplicationContext):
+    reload_settings()
+    await ctx.respond("Settings reloaded", ephemeral=True)
+
+
+# /edit_settings - owner only
+@bot.slash_command(guild_ids=guildIDS, description="Add/remove ids from settings")
+@commands.cooldown(1, 5)
+@commands.is_owner()
+@guild_only()
+@option(
+        "setting",
+        description="Setting to change",
+        choices=["guildIDS", "modRoleIDS", "generalRoleIDS", "hackerRoleID", "bypassIDS"])
+@option(
+        "id_value",
+        description="Enable or disable")
+@option(
+        "add_remove",
+        description="Add or remove",
+        choices=["Add", "Remove"])
+async def edit_settings(ctx: discord.ApplicationContext, setting: str, id_value: str, add_remove: str):
+    response = edit_setting(setting, int(id_value), add_remove)
+    reload_settings()
+    await ctx.respond(response, ephemeral=True)
+
+
+def reload_settings():
+    global settings
+    settings = load_settings()
+    global globalguildIDS
+    globalguildIDS = settings["guildIDS"]
+    global modRoleIDS
+    modRoleIDS = settings["modRoleIDS"]
+    global generalRoleIDS
+    generalRoleIDS = settings["generalRoleIDS"]
+    global hackerRoleID
+    hackerRoleID = settings["hackerRoleID"]
+    global bypassIDS
+    bypassIDS = settings["bypassIDS"]
+    global checkLobbyCodes
+    checkLobbyCodes = settings["lobbyCodesDetection"]
+    global checkHackerNames
+    checkHackerNames = settings["hackerNameDetection"]
+
+
+def edit_setting(name_setting, value_setting, add_remove=None):
+    match add_remove:
+        case "Add":
+            try:
+                settings[name_setting].append(value_setting)
+            except Exception as exc:
+                return f"Error with adding {value_setting} to {name_setting}: {exc}"
+        case "Remove":
+            try:
+                settings[name_setting].remove(value_setting)
+            except Exception as exc:
+                return f"Error with removing {value_setting} from {name_setting}: {exc}"
+        case _:
+            settings[name_setting] = value_setting
+
+    with open("settings.json", "w") as jFile:
+        dump(settings, jFile, indent=0)
+
+    if add_remove == "Add":
+        return f"Added {value_setting} to {name_setting}"
+    else:
+        return f"Removed {value_setting} from {name_setting}"
+
+
+# """
+# ############################# Message Reading ####################################
+
+# Experimental features that are not yet implemented
+
+# """
+# @bot.event
+# @guild_only()
+# @commands.bot_has_permissions(view_channel=True)
+# async def on_message(message):
+#     if(message.author.bot or message.is_system()): # Don't need to check bot and system messages (also makes it ignore messages from itself)
+#         return
     
+#     if(message.attachments):
+#         action, reason = check_images(message.attachments)
+#         match action:
+#             case 1: # Read message history perms
+#                 await message.reply("Use lobby bot instead. `/lobby <code>`")
+#             case 2: # Manage messages perms
+#                 await message.delete()
+#                 await message.channel.send(f"Message deleted for reason: {reason}")
+#             case _:
+#                 return
+
+
+# def check_images(attachments):
+#     action = 0
+#     reason = None
+#     for a in attachments:
+#         # print(type(a), dir(a))
+#         print(a.description, a.url, a.content_type)
+#         if(a.content_type):
+#             c_type, sc_type = a.content_type.split("/")
+#             if(c_type == "image" and sc_type != "gif"):
+#                 action, reason = check_image_easyocr(a.url)
+
+#     return action, reason
+
+
+# def check_image_easyocr(url):
+#     # send image url over to easyocr api
+#     # async stuff to be implemented here 
+#     return 1, None
+
+
+
 
 bot.run(token)

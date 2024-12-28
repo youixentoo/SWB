@@ -19,5 +19,7 @@
 627692577444855828
 ],
 "lobbyCodesDetection": false,
-"hackerNameDetection": true
+"hackerNameDetection": true,
+"usethebotTitle": "Use Lobby Bot to safely host lobbies",
+"usethebotDescription": "This bot is a protection against [[box-spawners]](<https://discord.com/channels/1000163670808068147/1000163671923765327/1201595194559184926>), rule-12-breaking hackers, and other problematic users, and is also a convenient way to share your lobby with other players.\\nUse **/lobby** to share your code. \\n[[More info + video guide]](<https://discord.com/channels/1000163670808068147/1000163671923765327/1139339639023476758>)"
 }

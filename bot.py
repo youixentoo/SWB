@@ -506,10 +506,8 @@ async def usethebot(ctx: discord.ApplicationContext, mention: str=None):
 
     """
     embed = discord.Embed(
-        title="Use Lobby Bot to safely host lobbies",
-        description="""This bot is a protection against [[box-spawners]](<https://discord.com/channels/1000163670808068147/1000163671923765327/1201595194559184926>), rule-12-breaking hackers, and other problematic users, and is also a convenient way to share your lobby with other players.
-        Use **/lobby** to share your code.
-        [[More info + video guide]](<https://discord.com/channels/1000163670808068147/1000163671923765327/1139339639023476758>)""",
+        title=settings["usethebotTitle"].replace("\\n", "\n"), # Using the /commands to change the embed and saving it changes \n into \\n, which don't go to a newline
+        description=settings["usethebotDescription"].replace("\\n", "\n"),
         color=discord.Colour.brand_green(), # Pycord provides a class with default colors you can choose from
     )
 
@@ -775,6 +773,45 @@ async def features(ctx: discord.ApplicationContext, feature: str, enabled: bool)
     await ctx.respond(f"{feature}: {enabled}", ephemeral=True)
 
 
+# /get_usethebot_embed
+@bot.slash_command(guild_ids=guildIDS, description="Retrieve the current text of the embed for /usethebot")
+@commands.cooldown(1, 5)
+@commands.check_any(has_required_role(*modRoleIDS), commands.is_owner())
+@guild_only()
+@option(
+        "hidden",
+        description="Response hidden?",
+        required=False,
+        default=False)
+async def get_usethebot_embed(ctx: discord.ApplicationContext, hidden: bool=False):
+    embed = discord.Embed(
+        title="Current unformatted text of /usethebot",
+        description=f"""Title:\n`{settings["usethebotTitle"]}`\n\nDescription:\n`{settings["usethebotDescription"]}`""",
+        color=discord.Colour.dark_blue(), # Pycord provides a class with default colors you can choose from
+    )
+    await ctx.respond(embed=embed, ephemeral=hidden)
+
+
+# /edit_usethebot_embed
+@bot.slash_command(guild_ids=guildIDS, description="Change the title and description of the embed for /usethebot")
+@commands.cooldown(1, 5)
+@commands.check_any(has_required_role(*modRoleIDS), commands.is_owner())
+@guild_only()
+@option(
+        "title",
+        description="Title of the embed",
+        required=True
+        )
+@option(
+        "description",
+        description="Description of the embed",
+        required=True
+        )
+async def edit_usethebot_embed(ctx: discord.ApplicationContext, title: str, description: str):
+    edit_utb_embed(title, description)
+    await ctx.respond("/usethebot Embed changed", ephemeral=True)
+
+
 # /reload_settings
 @bot.slash_command(guild_ids=guildIDS, description="Reload bot settings (Usefulness for staff not implemented)")
 @commands.cooldown(1, 5)
@@ -807,6 +844,7 @@ async def edit_settings(ctx: discord.ApplicationContext, setting: str, id_value:
     await ctx.respond(response, ephemeral=True)
 
 
+# Reload settings if changed externally
 def reload_settings():
     global settings
     settings = load_settings()
@@ -826,6 +864,7 @@ def reload_settings():
     checkHackerNames = settings["hackerNameDetection"]
 
 
+# Function handling changing of settings, both /features and /edit_settings go here
 def edit_setting(name_setting, value_setting, add_remove=None):
     match add_remove:
         case "Add":
@@ -848,6 +887,16 @@ def edit_setting(name_setting, value_setting, add_remove=None):
         return f"Added {value_setting} to {name_setting}"
     else:
         return f"Removed {value_setting} from {name_setting}"
+    
+
+# Function handling changing the title and description of the /usethebot embed
+def edit_utb_embed(title, description):
+    settings["usethebotTitle"] = title
+    settings["usethebotDescription"] = description
+
+    with open("settings.json", "w") as jFile:
+        dump(settings, jFile, indent=0)
+
 
 
 # """

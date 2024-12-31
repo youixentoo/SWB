@@ -55,6 +55,8 @@ hackerRoleID = settings["hackerRoleID"]
 bypassIDS = settings["bypassIDS"]
 checkLobbyCodes = settings["lobbyCodesDetection"]
 checkHackerNames = settings["hackerNameDetection"]
+lobbyEmbedFSS = settings["lobbyEmbedTitleFStringStart"]
+lobbyEmbedFSE = settings["lobbyEmbedTitleFStringEnd"]
 
 intents = discord.Intents.default()
 intents.message_content = True
@@ -206,7 +208,7 @@ async def on_application_command(ctx: discord.ApplicationContext):
     logger.info(f"User: {ctx.user} ({ctx.user.id}) used command: /{ctx.command}")
 
 
-# User command
+# User command - /lobby
 @bot.slash_command(guild_ids=guildIDS, description="Create a lobby for other players to join")
 @commands.cooldown(5, 2)
 @guild_only()
@@ -256,9 +258,10 @@ async def lobby(ctx: discord.ApplicationContext, code: str, description: str, ha
     message_unix_time = int(time())
     unique_id = uuid4()
     findall_role_tags = " ".join(findall("<@&\d+>", description))
+    embed_title = sub("<@&\d+>", "", description)
 
     embed = discord.Embed(
-        title=sub("<@&\d+>", "", description),
+        title=f"{lobbyEmbedFSS}{embed_title}{lobbyEmbedFSE}",
         description=f"**Host:** <@{ctx.user.id}>\n**ID:** `{unique_id}`",
         color=discord.Colour.blurple(), # Pycord provides a class with default colors you can choose from
     )
@@ -823,23 +826,27 @@ async def reload_settings(ctx: discord.ApplicationContext):
 
 
 # /edit_settings - owner only
-@bot.slash_command(guild_ids=guildIDS, description="Add/remove ids from settings")
+@bot.slash_command(guild_ids=guildIDS, description="Change the id values, or string for lobbyEmbed")
 @commands.cooldown(1, 5)
 @commands.is_owner()
 @guild_only()
 @option(
         "setting",
         description="Setting to change",
-        choices=["guildIDS", "modRoleIDS", "generalRoleIDS", "hackerRoleID", "bypassIDS"])
+        choices=["guildIDS", "modRoleIDS", "generalRoleIDS", "hackerRoleID", "bypassIDS", "lobbyEmbed"])
 @option(
-        "id_value",
-        description="Enable or disable")
+        "value",
+        description="Change the id value, or string for lobbyEmbed (seperate with |)")
 @option(
         "add_remove",
-        description="Add or remove",
+        description="Add or remove (ignored when changing lobbyEmbed)",
         choices=["Add", "Remove"])
-async def edit_settings(ctx: discord.ApplicationContext, setting: str, id_value: str, add_remove: str):
-    response = edit_setting(setting, int(id_value), add_remove)
+async def edit_settings(ctx: discord.ApplicationContext, setting: str, value: str, add_remove: str):
+    if setting == "lobbyEmbed":
+        response = edit_lobby_embed(*value.split("|"))
+    else:
+        response = edit_setting(setting, int(value), add_remove)
+    
     reload_settings()
     await ctx.respond(response, ephemeral=True)
 
@@ -862,6 +869,10 @@ def reload_settings():
     checkLobbyCodes = settings["lobbyCodesDetection"]
     global checkHackerNames
     checkHackerNames = settings["hackerNameDetection"]
+    global lobbyEmbedFSS
+    lobbyEmbedFSS = settings["lobbyEmbedTitleFStringStart"]
+    global lobbyEmbedFSE
+    lobbyEmbedFSE = settings["lobbyEmbedTitleFStringEnd"]
 
 
 # Function handling changing of settings, both /features and /edit_settings go here
@@ -887,6 +898,17 @@ def edit_setting(name_setting, value_setting, add_remove=None):
         return f"Added {value_setting} to {name_setting}"
     else:
         return f"Removed {value_setting} from {name_setting}"
+
+
+# Function handling changing the start and end of the title in the /lobby embed
+def edit_lobby_embed(start, end):
+    settings["lobbyEmbedTitleFStringStart"] = start
+    settings["lobbyEmbedTitleFStringEnd"] = end
+
+    with open("settings.json", "w") as jFile:
+        dump(settings, jFile, indent=0)
+
+    return f"Changed to: {start} <text> {end}"
     
 
 # Function handling changing the title and description of the /usethebot embed

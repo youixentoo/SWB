@@ -92,17 +92,18 @@ class ShowCodeButtonView(discord.ui.View): # Create a class called ShowCodeButto
 
     @discord.ui.button(label="Show code", style=discord.ButtonStyle.primary) # Create a button with a label with color Blurple
     async def button_callback(self, button, interaction):
+        await interaction.response.defer() # In case the following lines take more than 3 seconds (max lifespan of interactions)
         logger.info(f"User: {interaction.user} ({interaction.user.id}) pressed the 'Show Code' button")
         bucket = self.cd.get_bucket(interaction.message)
         retry_after = bucket.update_rate_limit()
         if retry_after:
-            return await interaction.response.send_message(f"Too many requests. Try again in: {round(retry_after, 1)} seconds.", ephemeral=True)
-        # == 281493155377840128
+            return await interaction.followup.send(f"Too many requests. Try again in: {round(retry_after, 1)} seconds.", ephemeral=True)
+        
         if interaction.user.id in bypassIDS or hacker_check(bool(interaction.user.get_role(hackerRoleID)), self.hackers): # Check if the person has hacker role # 'other' role in test server: 1027299501356093562
             show_code_db(self.db_primary_key, interaction.user.id)
-            await interaction.response.send_message(content=self.code.upper(), ephemeral=True) # Send a message when the button is clicked       
+            await interaction.followup.send(content=self.code.upper(), ephemeral=True) # Send a message when the button is clicked
         else:
-            await interaction.response.send_message(content="The host of this match has prevented hackers from joining", ephemeral=True) # Send a message when the button is clicked
+            await interaction.followup.send(content="The host of this match has prevented hackers from joining", ephemeral=True) # Send a message when the button is clicked
             
     @discord.ui.button(label="Close", style=discord.ButtonStyle.red) # Create a button with a label with color Red
     async def second_button_callback(self, button, interaction):
@@ -249,10 +250,11 @@ async def lobby(ctx: discord.ApplicationContext, code: str, description: str, ha
     the other is used to close the match by the person who hosted.
 
     """
+    await ctx.defer(ephemeral=True) # In case the following takes longer than 3 seconds for whatever reason (max lifespan of interactions)
     sub_code = sub(r"[\W]+", "", code, flags=UNICODE) # Remove any non letters
 
     if(len(sub_code) != 6 or not sub_code.isalpha()): # Checks code length and if it's only letters (redundant)
-        await ctx.respond(content=f"Invalid lobby code: {sub_code}", ephemeral=True)
+        await ctx.send_followup(content=f"Invalid lobby code: {sub_code}", ephemeral=True)
         return
 
     message_unix_time = int(time())
@@ -303,13 +305,14 @@ async def getlobby(ctx: discord.ApplicationContext, code: str, hidden: bool = Fa
     The data from the match.
 
     """
+    await ctx.defer(ephemeral=hidden) # In case searching takes longer than 3 seconds (max lifespan of interactions)
     # Check for length of the code to determine the type of code to search the database for.
     if(len(code) == 6):
         match_data = get_lobby_code_db(code.upper())
     elif(len(code) == 36):
         match_data = get_uuid_code_db(code)
     else:
-        await ctx.respond("Please enter a valid code", ephemeral=True)
+        await ctx.send_followup("Please enter a valid code", ephemeral=True)
         return
 
     lobby, host, date, *participants = match_data
@@ -324,7 +327,7 @@ async def getlobby(ctx: discord.ApplicationContext, code: str, hidden: bool = Fa
         color=discord.Colour.dark_blue(), # Pycord provides a class with default colors you can choose from
     )
 
-    await ctx.respond(embed=embed, ephemeral=hidden)
+    await ctx.send_followup(embed=embed, ephemeral=hidden)
 
 
 # /getlobbys
@@ -357,6 +360,7 @@ async def getlobbys(ctx: discord.ApplicationContext, codes: str, hidden: bool=Fa
     Data from the matches as a .tsv file.
 
     """
+    await ctx.defer(ephemeral=hidden) # In case searching takes longer than 3 seconds (max lifespan of interactions)
     t_codes = tuple(codes.split(" "))
     sum_l = sum(map(lambda c: len(c), codes.split(" ")))
 
@@ -366,7 +370,7 @@ async def getlobbys(ctx: discord.ApplicationContext, codes: str, hidden: bool=Fa
         elif(sum_l / len(t_codes) == 36):
             data = get_uuid_codes_db(t_codes)
         else:
-            await ctx.respond("Please enter valid codes", ephemeral=True)
+            await ctx.send_followup("Please enter valid codes", ephemeral=True)
             return
     except OperationalError:
         raise ExceptionDisplayMessage("Select more than 1 code please")
@@ -377,7 +381,7 @@ async def getlobbys(ctx: discord.ApplicationContext, codes: str, hidden: bool=Fa
         color=discord.Colour.dark_blue(), # Pycord provides a class with default colors you can choose from
     )
 
-    await ctx.respond(embed=embed, ephemeral=hidden)
+    await ctx.send_followup(embed=embed, ephemeral=hidden)
     # response = discord.File("files/lobby_data.txt")
     # await ctx.respond(file=response)
 
@@ -418,6 +422,7 @@ async def getuser(ctx: discord.ApplicationContext, user: str, amount: int=2, hid
     List of match ids
 
     """
+    await ctx.defer(ephemeral=hidden) # In case searching takes longer than 3 seconds (max lifespan of interactions)
     if amount < 2 or amount > 20:
         raise ExceptionDisplayMessage("Amount needs to be 2-20") 
 
@@ -429,9 +434,9 @@ async def getuser(ctx: discord.ApplicationContext, user: str, amount: int=2, hid
             description="<@{}>\n\n{}".format(user, "".join(embed_lines(lobbies))),
             color=discord.Colour.dark_blue(), # Pycord provides a class with default colors you can choose from
         )
-        await ctx.respond(embed=embed, ephemeral=hidden)
+        await ctx.send_followup(embed=embed, ephemeral=hidden)
     else:
-        await ctx.respond(f"No data found for user id: {user}", ephemeral=hidden)
+        await ctx.send_followup(f"No data found for user id: {user}", ephemeral=hidden)
 
 
 # /stats
@@ -547,6 +552,7 @@ async def query(ctx: discord.ApplicationContext, query: str, hidden: bool=False)
     Data.
 
     """
+    await ctx.defer(ephemeral=hidden) # In case searching takes longer than 3 seconds (max lifespan of interactions)
     if("drop table" in query.lower()):
         await ctx.respond("No dropping tables here", ephemeral=True)
         return
@@ -558,9 +564,9 @@ async def query(ctx: discord.ApplicationContext, query: str, hidden: bool=False)
             description="{}".format("".join(make_lines(output))),
             color=discord.Colour.dark_green(), # Pycord provides a class with default colors you can choose from
         )
-        await ctx.respond(embed=embed, ephemeral=hidden)
+        await ctx.send_followup(embed=embed, ephemeral=hidden)
     else:
-        await ctx.respond(f"Query: {query} executed", ephemeral=hidden)
+        await ctx.send_followup(f"Query: {query} executed", ephemeral=hidden)
 
 # From here on it's database related functions
 

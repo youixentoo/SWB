@@ -52,6 +52,7 @@ guildIDS = settings["guildIDS"]
 modRoleIDS = settings["modRoleIDS"]
 generalRoleIDS = settings["generalRoleIDS"]
 hackerRoleID = settings["hackerRoleID"]
+rolePingWhitelist = settings["rolePingWhitelist"]
 bypassIDS = settings["bypassIDS"]
 checkLobbyCodes = settings["lobbyCodesDetection"]
 checkHackerNames = settings["hackerNameDetection"]
@@ -259,7 +260,7 @@ async def lobby(ctx: discord.ApplicationContext, code: str, description: str, ha
 
     message_unix_time = int(time())
     unique_id = uuid4()
-    findall_role_tags = " ".join(findall("<@&\d+>", description))
+    findall_role_tags = " ".join([role_id for role_id in findall("<@&\d+>", description) if role_id in rolePingWhitelist])
     embed_title = sub("<@&\d+>", "", description)
 
     embed = discord.Embed(
@@ -839,7 +840,7 @@ async def reload_settings(ctx: discord.ApplicationContext):
 @option(
         "setting",
         description="Setting to change",
-        choices=["guildIDS", "modRoleIDS", "generalRoleIDS", "hackerRoleID", "bypassIDS", "lobbyEmbed"])
+        choices=["guildIDS", "modRoleIDS", "generalRoleIDS", "hackerRoleID", "rolePingWhitelist", "bypassIDS", "lobbyEmbed"])
 @option(
         "value",
         description="Change the id value, or string for lobbyEmbed (seperate with |)")
@@ -850,6 +851,8 @@ async def reload_settings(ctx: discord.ApplicationContext):
 async def edit_settings(ctx: discord.ApplicationContext, setting: str, value: str, add_remove: str):
     if setting == "lobbyEmbed":
         response = edit_lobby_embed(*value.split("|"))
+    elif setting == "rolePingWhitelist":
+        response = edit_setting(setting, value, add_remove)
     else:
         response = edit_setting(setting, int(value), add_remove)
     
@@ -869,6 +872,8 @@ def reload_settings():
     generalRoleIDS = settings["generalRoleIDS"]
     global hackerRoleID
     hackerRoleID = settings["hackerRoleID"]
+    global rolePingWhitelist
+    rolePingWhitelist = settings["rolePingWhitelist"]
     global bypassIDS
     bypassIDS = settings["bypassIDS"]
     global checkLobbyCodes
